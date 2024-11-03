@@ -1,6 +1,10 @@
 package com.example.gamemaster
 
+import android.annotation.SuppressLint
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.content.Context
+import android.icu.util.Calendar
 import android.os.Bundle
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
@@ -14,6 +18,8 @@ import com.google.gson.reflect.TypeToken
 
 class EditMatchFragment : Fragment() {
     private lateinit var match: MatchModel // 用于存储传递过来的比赛对象
+    private lateinit var timeEditText: EditText
+    private var tournament: TournamentModel? = null
 
     // 创建视图
     override fun onCreateView(
@@ -35,7 +41,7 @@ class EditMatchFragment : Fragment() {
         // 初始化 UI 组件
         val team1TextView: TextView = view.findViewById(R.id.editTextTeam1)
         val team2TextView: TextView = view.findViewById(R.id.editTextTeam2)
-        val timeEditText: EditText = view.findViewById(R.id.editTextMatchTime)
+        timeEditText = view.findViewById(R.id.editTextMatchTime)
         val refereeEditText: EditText = view.findViewById(R.id.editTextReferee)
         val saveButton: Button = view.findViewById(R.id.buttonSave)
 
@@ -45,27 +51,44 @@ class EditMatchFragment : Fragment() {
         timeEditText.setText(match.matchTime) // 显示比赛时间
         refereeEditText.setText(match.referee) // 显示裁判员信息
 
+        timeEditText.setOnClickListener {
+            showDateTimePicker()
+        }
+
         // 设置保存按钮的点击事件
         saveButton.setOnClickListener {
-            saveMatch(timeEditText.text.toString(), refereeEditText.text.toString())
+            val updatedMatch = MatchModel(
+                matchTime = timeEditText.text.toString(),
+                referee = "裁判员", // 根据需要获取裁判员
+                teamA = team1TextView.text.toString(),
+                teamB = team2TextView.text.toString()
+            )
+
+            // 更新比赛信息
+            updateMatchInSharedPreferences(updatedMatch)
+
+            // 返回到 EditTournamentFragment
+            requireActivity().supportFragmentManager.popBackStack()
         }
     }
 
-    private fun saveMatch(newTime: String, newReferee: String) {
-        // 更新比赛信息
-        match.matchTime = newTime
-        match.referee = newReferee
+    // 显示日期选择器
+    @SuppressLint("DefaultLocale")
+    private fun showDateTimePicker() {
+        val calendar = Calendar.getInstance()
+        val datePickerDialog = DatePickerDialog(requireContext(), { _, year, month, dayOfMonth ->
+            val timePickerDialog = TimePickerDialog(requireContext(), { _, hourOfDay, minute ->
+                val selectedTime = String.format("%04d-%02d-%02d %02d:%02d", year, month + 1, dayOfMonth, hourOfDay, minute)
+                timeEditText.setText(selectedTime)
+            }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true)
+            timePickerDialog.show()
+        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH))
 
-        // 保存更新后的比赛信息
-        updateMatchInSharedPreferences()
-
-        // 关闭当前 Fragment
-        requireActivity().supportFragmentManager.popBackStack()
+        datePickerDialog.show()
     }
 
-    private fun updateMatchInSharedPreferences() {
+    private fun updateMatchInSharedPreferences(updatedMatch: MatchModel) {
         // 更新 SharedPreferences 中的比赛信息
-        // 这里需要加载当前的比赛列表，更新相应的比赛
         val sharedPreferences = requireContext().getSharedPreferences("tournament_data", Context.MODE_PRIVATE)
         val gson = Gson()
         val json = sharedPreferences.getString("match_list", null)
@@ -78,15 +101,20 @@ class EditMatchFragment : Fragment() {
         }
 
         // 查找并更新比赛信息
-        val index = matchList.indexOfFirst { it.teamA == match.teamA && it.teamB == match.teamB }
+        val index = matchList.indexOfFirst { it.teamA == updatedMatch.teamA && it.teamB == updatedMatch.teamB }
         if (index != -1) {
-            matchList[index] = match // 更新
+            matchList[index] = updatedMatch  // 更新
         }
 
         // 保存更新后的数据
         val editor = sharedPreferences.edit()
         editor.putString("match_list", gson.toJson(matchList))
         editor.apply()
+
+        // 更新 generatedMatches 列表
+        tournament?.generatedMatches = matchList // 更新 TournamentModel 中的赛程列表
+        // 通知适配器数据已更新
+//        MatchAdapter.MatchViewHolder // 假设你有一个 matchAdapter
     }
 
     companion object {

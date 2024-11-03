@@ -15,6 +15,7 @@ class MatchAdapter(private val matchList: List<MatchModel>,
         val matchTime: TextView = itemView.findViewById(R.id.tv_match_time)
         val teams: TextView = itemView.findViewById(R.id.tv_teams)
         val referee: TextView = itemView.findViewById(R.id.tv_referee)
+
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MatchViewHolder {
@@ -36,4 +37,12 @@ class MatchAdapter(private val matchList: List<MatchModel>,
     }
 
     override fun getItemCount() = matchList.size
+
+    // 更新比赛列表
+    @SuppressLint("NotifyDataSetChanged")
+    fun updateMatches(newMatchList: List<MatchModel>) {
+        (matchList as MutableList).clear() // 清空当前列表
+        matchList.addAll(newMatchList) // 添加新数据
+        notifyDataSetChanged() // 通知适配器数据已更改
+    }
 }

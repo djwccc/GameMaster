@@ -6,7 +6,6 @@ import android.app.TimePickerDialog
 import android.content.Context
 import android.icu.util.Calendar
 import android.os.Bundle
-import android.util.Log
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.Menu
@@ -90,6 +89,7 @@ class EditTournamentFragment : Fragment() {
             requireActivity().supportFragmentManager.popBackStack() // 退出 Fragment
         }
 
+        // 时间选择
         timeContainer = view.findViewById(R.id.timeContainer)
         val btnAddTime: Button = view.findViewById(R.id.btnAddTime)
         btnAddTime.setOnClickListener {
@@ -107,11 +107,10 @@ class EditTournamentFragment : Fragment() {
                 tournament?.referees?.split(", ") ?: emptyList(),
                 tournament?.matchTimes?.split(", ") ?: emptyList()
             )
-
+            tournament?.generatedMatches = matchList
             // 更新 tournament 的状态
             tournament?.isScheduleGenerated = true
             updateTournament(tournament!!) // 更新到 SharedPreferences
-
             // 设置 RecyclerView 适配器
             val adapter = MatchAdapter(matchList) { match ->
                 openEditMatchFragment(match) // 点击小卡片时打开编辑界面
@@ -124,7 +123,6 @@ class EditTournamentFragment : Fragment() {
 
 
         // 初始化 UI 组件
-        val tournamentNameEditText: EditText = view.findViewById(R.id.editTextTournamentName)
         matchTypeSpinner = view.findViewById(R.id.spinnerMatchType)
         matchFormatSpinner = view.findViewById(R.id.spinnerMatchFormat)
         val teamsEditText: EditText = view.findViewById(R.id.editTextTeams)
@@ -420,16 +418,24 @@ class EditTournamentFragment : Fragment() {
         // 将生成的比赛信息保存到 SharedPreferences 中
         saveMatchesToSharedPreferences(matchList)
 
-        return matchList
+        return matchList.sortedBy { it.matchTime } // 根据 matchTime 排序
     }
 
     private fun loadExistingMatches() {
-        // 从 SharedPreferences 中加载已生成的比赛
-        val matches = getMatchesFromSharedPreferences()
-        val adapter = MatchAdapter(matches) { match ->
-            openEditMatchFragment(match)
+        // 从 SharedPreferences 获取并显示赛程信息
+        val sharedPreferences = requireContext().getSharedPreferences("tournament_data", Context.MODE_PRIVATE)
+        val gson = Gson()
+        val json = sharedPreferences.getString("match_list", null)
+
+        val type = object : TypeToken<MutableList<MatchModel>>() {}.type
+        val matchList: MutableList<MatchModel> = if (json != null) {
+            gson.fromJson(json, type)
+        } else {
+            mutableListOf()
         }
-        matchRecyclerView.adapter = adapter
+
+        // 更新适配器显示
+//        MatchAdapter.updateMatches(matchList.sortedBy { it.matchTime }) // 再次排序确保显示顺序正确
     }
 
     private fun getMatchesFromSharedPreferences(): List<MatchModel> {
