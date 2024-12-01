@@ -9,8 +9,7 @@ data class TournamentModel(
     var teams: String,
     var referees: String,
     var matchTimes: String,
-    var isScheduleGenerated: Boolean = false, // 新增属性
-    var generatedMatches: List<MatchModel>? = null
+    var generatedMatches: MutableList<MatchModel>? = mutableListOf()
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
         parcel.readString() ?: "",

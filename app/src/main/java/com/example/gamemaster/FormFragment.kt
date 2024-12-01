@@ -79,30 +79,11 @@ class FormFragment : Fragment() {
         // 初始化 UI 组件和逻辑
         matchTypeSpinner = view.findViewById(R.id.spinnerMatchType)
         matchFormatSpinner = view.findViewById(R.id.spinnerMatchFormat)
-        val teamsEditText: EditText = view.findViewById(R.id.editTextTeams)
         val refereeEditText: EditText = view.findViewById(R.id.editTextReferee)
-//        val btnAddTeam: Button = view.findViewById(R.id.btnAddTeam)
-//        val chipGroupTeams: ChipGroup = view.findViewById(R.id.chipGroupTeams)
+        gradeInput = view.findViewById(R.id.editTextGrade)
+        classCountInput = view.findViewById(R.id.editTextClassCount)
         val btnAddReferee: Button = view.findViewById(R.id.btnAddReferee)
         val chipGroupReferees: ChipGroup = view.findViewById(R.id.chipGroupReferees)
-
-        // 添加队伍添加按钮点击事件
-//        btnAddTeam.setOnClickListener {
-//            val teamName = teamsEditText.text.toString()
-//            if (teamName.isNotBlank()) {
-//                // 创建 Chip 并设置文本
-//                val chip = Chip(context)
-//                chip.text = teamName
-//                chip.isCloseIconVisible = true
-//                chip.setOnCloseIconClickListener {
-//                    chipGroupTeams.removeView(chip) // 删除 Chip
-//                }
-//
-//                 添加 Chip 到 ChipGroup
-//                chipGroupTeams.addView(chip)
-//                teamsEditText.text.clear() // 清空输入框
-//            }
-//        }
 
         // 添加裁判员添加按钮点击事件
         btnAddReferee.setOnClickListener {
@@ -118,7 +99,7 @@ class FormFragment : Fragment() {
 
                 // 添加 Chip 到 ChipGroup
                 chipGroupReferees.addView(chip)
-                teamsEditText.text.clear() // 清空输入框
+                refereeEditText.text.clear() // 清空输入框
             }
         }
 
@@ -169,19 +150,6 @@ class FormFragment : Fragment() {
         }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true)
         timePickerDialog.show()
     }
-
-//    private fun showDateTimePicker() {
-//        val calendar = Calendar.getInstance()
-//        val datePickerDialog = DatePickerDialog(requireContext(), { _, year, month, dayOfMonth ->
-//            val timePickerDialog = TimePickerDialog(requireContext(), { _, hourOfDay, minute ->
-//                val selectedTime = String.format("%04d-%02d-%02d %02d:%02d", year, month + 1, dayOfMonth, hourOfDay, minute)
-//                addTimeView(selectedTime)
-//            }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true)
-//            timePickerDialog.show()
-//        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH))
-//
-//        datePickerDialog.show()
-//    }
 
     private fun addDateView(selectedDate: String) {
         // 创建时间视图
@@ -234,7 +202,7 @@ class FormFragment : Fragment() {
         val selectedMatchType = matchTypeSpinner.selectedItem.toString()
         val selectedMatchFormat = matchFormatSpinner.selectedItem.toString()
         val classCount = classCountInput.text.toString().toIntOrNull()
-        val grade = gradeInput.text.toString().toIntOrNull()
+        val grade = gradeInput.text.toString()
 
         // 获取比赛时间
         val matchTimes = mutableListOf<String>()
@@ -244,24 +212,16 @@ class FormFragment : Fragment() {
             for (i in 0 until timeContainer.childCount) {
                 val timeLayout = timeContainer.getChildAt(i) as LinearLayout
                 val timeTextView = timeLayout.getChildAt(0) as TextView
-                val matchDateTime = "$dateTextView $timeTextView"
+                val matchDateTime = "${dateTextView.text.toString()} ${timeTextView.text.toString()}"
                 matchTimes.add(matchDateTime)
             }
         }
         val timesList = matchTimes.joinToString(", ") // 用逗号分隔的时间列表
 
-//        val teams = mutableListOf<String>()
-//        val chipGroupTeams: ChipGroup = view?.findViewById(R.id.chipGroupTeams) ?: return
-//        for (i in 0 until chipGroupTeams.childCount) {
-//            val chip = chipGroupTeams.getChildAt(i) as Chip
-//            teams.add(chip.text.toString())
-//        }
-//        val teamsList = teams.joinToString(", ")
-
         // 生成班级队伍
         val teams = mutableListOf<String>()
         for (i in 1..classCount!!) {
-            val teamName = "$grade 年 $i 班"
+            val teamName = "$grade $i 班"
             teams.add(teamName) // 添加队伍到列表
         }
         val teamsList = teams.joinToString(", ")
@@ -275,6 +235,9 @@ class FormFragment : Fragment() {
         }
         val refereesList = referees.joinToString(", ")
 
+        // 生成赛程并保存
+        val matchList = generateMatches(teams, referees, matchTimes)
+
         // 创建新的赛程对象
         val tournament = TournamentModel(
             tournamentName,
@@ -284,7 +247,10 @@ class FormFragment : Fragment() {
             refereesList,
             timesList
         )
+        tournament.generatedMatches = matchList // 保存赛程
         (activity as? MainActivity)?.addTournament(tournament)
+        // 保存赛程到 SharedPreferences
+        saveMatchesToSharedPreferences(tournament)
         // 保存数据
         saveData(tournament)
         // 反馈给用户
@@ -311,6 +277,54 @@ class FormFragment : Fragment() {
         // 将数据保存回 SharedPreferences
         val editor = sharedPreferences.edit()
         editor.putString("tournament_list", gson.toJson(tournamentList))
+        editor.apply()
+    }
+
+    private fun generateMatches(teams: List<String>, referees: List<String>, matchTimes: List<String>): MutableList<MatchModel> {
+        val matchesList = mutableListOf<MatchModel>()
+        val totalMatches = teams.size * (teams.size - 1) / 2 // 总比赛场次
+        val availableMatchTimes = matchTimes.take(totalMatches) // 获取用户提供的可用比赛时间
+
+        val timeUsed = mutableSetOf<String>() // 存储已使用的时间
+
+        for (i in teams.indices) {
+            for (j in i + 1 until teams.size) {
+                val teamA = teams[i]
+                val teamB = teams[j]
+
+                // 找到未使用的时间
+                var matchTime: String? = null
+                for (time in availableMatchTimes) {
+                    if (!timeUsed.contains(time)) {
+                        matchTime = time
+                        timeUsed.add(time) // 标记为已使用
+                        break
+                    }
+                }
+
+                val referee = if (referees.isNotEmpty()) {
+                    referees.random()  // 随机选择裁判员
+                } else {
+                    "无裁判员"  // 如果为空，使用默认值
+                }
+
+                if (matchTime != null) {
+                    matchesList.add(MatchModel(matchTime, referee, teamA, teamB))
+                } else {
+                    matchesList.add(MatchModel("未安排", referee, teamA, teamB)) // 如果没有可用时间，标记为未安排
+                }
+            }
+        }
+
+        return matchesList.sortedBy { it.matchTime }.toMutableList() // 根据 matchTime 排序
+    }
+
+    private fun saveMatchesToSharedPreferences(tournament: TournamentModel) {
+        val sharedPreferences = requireContext().getSharedPreferences("tournament_data", Context.MODE_PRIVATE)
+        val gson = Gson()
+        val editor = sharedPreferences.edit()
+        val json = gson.toJson(tournament)
+        editor.putString("tournament", json)
         editor.apply()
     }
 }

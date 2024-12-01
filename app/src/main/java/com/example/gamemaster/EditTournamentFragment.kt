@@ -19,9 +19,11 @@ import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import androidx.annotation.OptIn
 import androidx.appcompat.widget.Toolbar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.commit
+import androidx.media3.common.util.UnstableApi
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
@@ -37,6 +39,7 @@ class EditTournamentFragment : Fragment() {
     private var tournament: TournamentModel? = null
     private lateinit var matchRecyclerView: RecyclerView
     private lateinit var timeContainer: LinearLayout
+    private lateinit var matchesList: MutableList<MatchModel>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,6 +66,8 @@ class EditTournamentFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        matchesList = mutableListOf()
 
         toolbar = view.findViewById(R.id.toolbar)
         (activity as AppCompatActivity).setSupportActionBar(toolbar)
@@ -96,31 +101,20 @@ class EditTournamentFragment : Fragment() {
             showDateTimePicker()
         }
 
-        // 生成赛程
+        // 加载赛程
         matchRecyclerView = view.findViewById(R.id.rv_matches)
         matchRecyclerView.layoutManager = LinearLayoutManager(requireContext())
 
-        // 使用生成的赛程
-        if (tournament != null && !tournament!!.isScheduleGenerated) {
-            val matchList = generateMatches(
-                tournament?.teams?.split(", ") ?: emptyList(),
-                tournament?.referees?.split(", ") ?: emptyList(),
-                tournament?.matchTimes?.split(", ") ?: emptyList()
-            )
-            tournament?.generatedMatches = matchList
-            // 更新 tournament 的状态
-            tournament?.isScheduleGenerated = true
-            updateTournament(tournament!!) // 更新到 SharedPreferences
-            // 设置 RecyclerView 适配器
-            val adapter = MatchAdapter(matchList) { match ->
-                openEditMatchFragment(match) // 点击小卡片时打开编辑界面
-            }
-            matchRecyclerView.adapter = adapter
-        } else {
-            // 如果赛程已生成，直接从 SharedPreferences 获取已生成的赛程
-            loadExistingMatches()
-        }
+        val matchList = tournament?.generatedMatches ?: emptyList()
 
+        // 将赛程按时间排序
+        val sortedMatchList = matchList.sortedBy { it.matchTime }
+
+        // 显示赛程
+        val matchAdapter = MatchAdapter(sortedMatchList) { match ->
+            openEditMatchFragment(match)
+        }
+        matchRecyclerView.adapter = matchAdapter
 
         // 初始化 UI 组件
         matchTypeSpinner = view.findViewById(R.id.spinnerMatchType)
@@ -383,79 +377,5 @@ class EditTournamentFragment : Fragment() {
             replace(R.id.fragment_container, fragment)
             addToBackStack(null) // 允许用户返回到上一个 Fragment
         }
-    }
-
-    private fun generateMatches(teams: List<String>, referees: List<String>, matchTimes: List<String>): List<MatchModel> {
-        val matchList = mutableListOf<MatchModel>()
-        val totalMatches = teams.size * (teams.size - 1) / 2 // 总比赛场次
-        val availableMatchTimes = matchTimes.take(totalMatches) // 获取用户提供的可用比赛时间
-
-        val timeUsed = mutableSetOf<String>() // 存储已使用的时间
-
-        for (i in teams.indices) {
-            for (j in i + 1 until teams.size) {
-                val teamA = teams[i]
-                val teamB = teams[j]
-
-                // 找到未使用的时间
-                var matchTime: String? = null
-                for (time in availableMatchTimes) {
-                    if (!timeUsed.contains(time)) {
-                        matchTime = time
-                        timeUsed.add(time) // 标记为已使用
-                        break
-                    }
-                }
-
-                val referee = referees.random()
-                if (matchTime != null) {
-                    matchList.add(MatchModel(matchTime, referee, teamA, teamB))
-                } else {
-                    matchList.add(MatchModel("未安排", referee, teamA, teamB)) // 如果没有可用时间，标记为未安排
-                }
-            }
-        }
-        // 将生成的比赛信息保存到 SharedPreferences 中
-        saveMatchesToSharedPreferences(matchList)
-
-        return matchList.sortedBy { it.matchTime } // 根据 matchTime 排序
-    }
-
-    private fun loadExistingMatches() {
-        // 从 SharedPreferences 获取并显示赛程信息
-        val sharedPreferences = requireContext().getSharedPreferences("tournament_data", Context.MODE_PRIVATE)
-        val gson = Gson()
-        val json = sharedPreferences.getString("match_list", null)
-
-        val type = object : TypeToken<MutableList<MatchModel>>() {}.type
-        val matchList: MutableList<MatchModel> = if (json != null) {
-            gson.fromJson(json, type)
-        } else {
-            mutableListOf()
-        }
-
-        // 更新适配器显示
-//        MatchAdapter.updateMatches(matchList.sortedBy { it.matchTime }) // 再次排序确保显示顺序正确
-    }
-
-    private fun getMatchesFromSharedPreferences(): List<MatchModel> {
-        val sharedPreferences = requireContext().getSharedPreferences("tournament_data", Context.MODE_PRIVATE)
-        val gson = Gson()
-        val json = sharedPreferences.getString("match_list", null)
-
-        val type = object : TypeToken<List<MatchModel>>() {}.type
-        return if (json != null) {
-            gson.fromJson(json, type)
-        } else {
-            emptyList()
-        }
-    }
-
-    private fun saveMatchesToSharedPreferences(matches: List<MatchModel>) {
-        val sharedPreferences = requireContext().getSharedPreferences("tournament_data", Context.MODE_PRIVATE)
-        val gson = Gson()
-        val editor = sharedPreferences.edit()
-        editor.putString("match_list", gson.toJson(matches))
-        editor.apply()
     }
 }
