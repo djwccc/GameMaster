@@ -1,22 +1,16 @@
 package com.example.gamemaster
-
-//data class MatchModel(
-//    val team1: String,
-//    val team2: String,
-//    var matchTime: String,
-//    var referee: String
-//)
-
 import android.os.Parcel
 import android.os.Parcelable
 
 data class MatchModel(
+    var matchId: String,
     var matchTime: String,
     var referee: String,
     var teamA: String,
     var teamB: String
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
+        parcel.readString() ?: "",
         parcel.readString() ?: "",
         parcel.readString() ?: "",
         parcel.readString() ?: "",

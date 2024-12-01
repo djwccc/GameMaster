@@ -39,6 +39,7 @@ class EditMatchFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         // 初始化 UI 组件
+        val matchId = match.matchId
         val team1TextView: TextView = view.findViewById(R.id.editTextTeam1)
         val team2TextView: TextView = view.findViewById(R.id.editTextTeam2)
         timeEditText = view.findViewById(R.id.editTextMatchTime)
@@ -58,6 +59,7 @@ class EditMatchFragment : Fragment() {
         // 设置保存按钮的点击事件
         saveButton.setOnClickListener {
             val updatedMatch = MatchModel(
+                matchId = matchId,
                 matchTime = timeEditText.text.toString(),
                 referee = "裁判员", // 根据需要获取裁判员
                 teamA = team1TextView.text.toString(),

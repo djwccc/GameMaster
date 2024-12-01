@@ -57,13 +57,6 @@
                 android:minHeight="48dp"
                 android:layout_height="wrap_content" />
 
-<!--            <EditText-->
-<!--                android:id="@+id/editTextTeams"-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:minHeight="60dp"-->
-<!--                android:hint="输入参赛队伍" />-->
-
             <!-- 年级输入框 -->
             <EditText
                 android:id="@+id/editTextGrade"
@@ -80,21 +73,6 @@
                 android:inputType="number"
                 android:minHeight="60dp"
                 android:hint="输入班级数目" />
-
-<!--            <Button-->
-<!--                android:id="@+id/btnAddTeam"-->
-<!--                android:layout_width="wrap_content"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:text="添加"-->
-<!--                android:backgroundTint="@color/design_default_color_primary_variant" />-->
-
-            <!-- 自动生成队伍的按钮 -->
-<!--            <Button-->
-<!--                android:id="@+id/btnGenerateTeams"-->
-<!--                android:layout_width="wrap_content"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:backgroundTint="@color/design_default_color_primary_variant"-->
-<!--                android:text="生成队伍" />-->
 
             <!-- 显示生成队伍的 ChipGroup -->
             <com.google.android.material.chip.ChipGroup

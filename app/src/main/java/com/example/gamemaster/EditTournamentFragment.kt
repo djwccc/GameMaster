@@ -1,11 +1,13 @@
 package com.example.gamemaster
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
 import android.icu.util.Calendar
 import android.os.Bundle
+import android.util.Log
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.Menu
@@ -22,6 +24,7 @@ import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.appcompat.widget.Toolbar
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.util.Pair
 import androidx.fragment.app.commit
 import androidx.media3.common.util.UnstableApi
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -39,7 +42,7 @@ class EditTournamentFragment : Fragment() {
     private var tournament: TournamentModel? = null
     private lateinit var matchRecyclerView: RecyclerView
     private lateinit var timeContainer: LinearLayout
-    private lateinit var matchesList: MutableList<MatchModel>
+    private lateinit var matchList: MutableList<MatchModel>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -67,7 +70,7 @@ class EditTournamentFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        matchesList = mutableListOf()
+        matchList = mutableListOf()
 
         toolbar = view.findViewById(R.id.toolbar)
         (activity as AppCompatActivity).setSupportActionBar(toolbar)
@@ -130,7 +133,7 @@ class EditTournamentFragment : Fragment() {
         setupSpinners()
 
         // 显示当前赛程信息
-        displayTournamentDetails(tournament)
+        displayTournamentDetails(tournament!!)
 
         // 添加队伍和裁判员的点击事件
         setupChipGroupListeners(btnAddTeam, teamsEditText, chipGroupTeams)
@@ -149,9 +152,9 @@ class EditTournamentFragment : Fragment() {
         matchFormatSpinner.adapter = matchFormatAdapter
     }
 
-    private fun displayTournamentDetails(tournament: TournamentModel?) {
-        tournament?.let {
-            val tournamentNameEditText: EditText = view?.findViewById(R.id.editTextTournamentName)!!
+    private fun displayTournamentDetails(tournament: TournamentModel) {
+        val tournamentNameEditText: EditText = view?.findViewById(R.id.editTextTournamentName)!!
+        tournament.let {
             tournamentNameEditText.setText(it.tournamentName)
             matchTypeSpinner.setSelection((matchTypeSpinner.adapter as ArrayAdapter<String>).getPosition(it.matchType))
             matchFormatSpinner.setSelection((matchFormatSpinner.adapter as ArrayAdapter<String>).getPosition(it.matchFormat))
@@ -252,11 +255,25 @@ class EditTournamentFragment : Fragment() {
     }
 
     // 保存修改后的赛程
+    @SuppressLint("CutPasteId")
     private fun saveTournament() {
         // 获取更新后的赛程信息
         val tournamentName = view?.findViewById<EditText>(R.id.editTextTournamentName)?.text.toString()
         val selectedMatchType = matchTypeSpinner.selectedItem.toString()
         val selectedMatchFormat = matchFormatSpinner.selectedItem.toString()
+        var isChangedInfo = false
+        if (
+            tournamentName!=tournament!!.tournamentName
+            || selectedMatchFormat!=tournament!!.matchFormat
+            || selectedMatchType!=tournament!!.matchType){
+            isChangedInfo = true
+        }
+        // 获取原信息，判断是否有改动
+        arguments?.let {
+            tournament = it.getParcelable(ARG_TOURNAMENT)
+        }
+        val originTeams = tournament?.teams?.split(", ")?.toMutableList()
+        val originReferees = tournament?.referees?.split(", ")?.toMutableList()
 
         // 获取参与的队伍
         val teams = mutableListOf<String>()
@@ -266,6 +283,9 @@ class EditTournamentFragment : Fragment() {
             teams.add(chip.text.toString())
         }
         val teamsList = teams.joinToString(", ") // 用逗号分隔的队伍列表
+        if (teamsList != originTeams?.joinToString(", ")){
+            isChangedInfo = true
+        }
 
         // 获取裁判员列表
         val referees = mutableListOf<String>()
@@ -275,6 +295,9 @@ class EditTournamentFragment : Fragment() {
             referees.add(chip.text.toString())
         }
         val refereesList = referees.joinToString(", ") // 用逗号分隔的队伍列表
+        if (refereesList != originReferees?.joinToString(", ")){
+            isChangedInfo = true
+        }
 
         // 获取比赛时间
         val matchTimes = mutableListOf<String>()
@@ -285,19 +308,37 @@ class EditTournamentFragment : Fragment() {
         }
         val timesList = matchTimes.joinToString(", ") // 用逗号分隔的时间列表
 
-        // 更新赛程对象
-        tournament?.let {
-            it.tournamentName = tournamentName
-            it.matchType = selectedMatchType
-            it.matchFormat = selectedMatchFormat
-            it.teams = teamsList
-            it.referees = refereesList
-            it.matchTimes = timesList
+        if (isChangedInfo){
+            AlertDialog.Builder(requireContext())
+                .setTitle("保存修改?")
+                .setMessage("您已修改了赛程信息。如果保存，赛程将会自动重新生成。")
+                .setPositiveButton("保存") { _, _ ->
+                    // 更新赛程对象
+                    tournament?.let {
+                        it.matchType = selectedMatchType
+                        it.matchFormat = selectedMatchFormat
+                        it.teams = teamsList
+                        it.referees = refereesList
+                        it.matchTimes = timesList
 
-            // 更新 SharedPreferences 中的数据
-            updateTournament(it)
+                        val matchList = generateMatches(
+                            tournament?.teams?.split(", ") ?: emptyList(),
+                            tournament?.referees?.split(", ") ?: emptyList(),
+                            tournament?.matchTimes?.split(", ") ?: emptyList()
+                        )
+                        tournament?.generatedMatches = matchList // 更新赛程
 
-            Toast.makeText(requireContext(), "赛程已更新", Toast.LENGTH_SHORT).show()
+                        // 更新 SharedPreferences 中的数据
+                        updateTournament(it)
+
+                        Toast.makeText(requireContext(), "赛程已更新", Toast.LENGTH_SHORT).show()
+                        (activity as? MainActivity)?.onFragmentClose() // 恢复 FloatingActionButton 和 AppBarLayout
+                        requireActivity().supportFragmentManager.popBackStack() // 退出 Fragment
+                    }
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        } else {
             (activity as? MainActivity)?.onFragmentClose() // 恢复 FloatingActionButton 和 AppBarLayout
             requireActivity().supportFragmentManager.popBackStack() // 退出 Fragment
         }
@@ -377,5 +418,56 @@ class EditTournamentFragment : Fragment() {
             replace(R.id.fragment_container, fragment)
             addToBackStack(null) // 允许用户返回到上一个 Fragment
         }
+    }
+
+    private fun generateMatches(teams: List<String>, referees: List<String>, matchTimes: List<String>): MutableList<MatchModel> {
+        val matchList = mutableListOf<MatchModel>()
+        val totalMatches = teams.size * (teams.size - 1) / 2 // 总比赛场次
+        val availableMatchTimes = matchTimes.take(totalMatches) // 获取用户提供的可用比赛时间
+        var matchId = 0
+        var matchTimeIndex = 0
+
+        // 先将班级按顺序排列，避免重复使用同一班级
+        val teamPairs = mutableListOf<Pair<String, String>>()
+        for (i in teams.indices) {
+            for (j in i + 1 until teams.size) {
+                teamPairs.add(Pair(teams[i], teams[j])) // 将所有班级配对
+            }
+        }
+
+        // 现在我们需要将配对的班级错开安排
+        val shuffledTeamPairs = teamPairs.shuffled() // 随机打乱班级配对
+        val matchTimeGroups = mutableListOf<MutableList<Pair<String, String>>>()
+
+        // 将所有配对分成不同的组别，每组间隔一定天数
+        var groupIndex = 0
+        for (pair in shuffledTeamPairs) {
+            if (groupIndex >= matchTimeGroups.size) {
+                matchTimeGroups.add(mutableListOf())
+            }
+            matchTimeGroups[groupIndex].add(pair)
+            groupIndex = (groupIndex + 1) % availableMatchTimes.size // 每组比赛使用不同的时间
+        }
+
+        // 为每个比赛安排时间和裁判
+        for (group in matchTimeGroups) {
+            for (pair in group) {
+                val teamA = pair.first
+                val teamB = pair.second
+                val matchTime = if (matchTimeIndex < availableMatchTimes.size) {
+                    availableMatchTimes[matchTimeIndex] // 从用户提供的时间中取
+                } else {
+                    "未安排"
+                }
+                val referee = if (referees.isNotEmpty()) {
+                    referees.random()  // 随机选择裁判员
+                } else "无裁判员"
+                matchList.add(MatchModel(matchId.toString(), matchTime, referee, teamA, teamB))
+                matchTimeIndex++
+                matchId++
+            }
+        }
+
+        return matchList.sortedBy { it.matchTime }.toMutableList() // 根据 matchTime 排序
     }
 }
