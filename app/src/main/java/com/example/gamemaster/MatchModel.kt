@@ -3,11 +3,11 @@ import android.os.Parcel
 import android.os.Parcelable
 
 data class MatchModel(
-    var matchId: String,
     var matchTime: String,
     var referee: String,
     var teamA: String,
-    var teamB: String
+    var teamB: String,
+    var matchId : String
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
         parcel.readString() ?: "",
@@ -22,6 +22,7 @@ data class MatchModel(
         parcel.writeString(referee)
         parcel.writeString(teamA)
         parcel.writeString(teamB)
+        parcel.writeString(matchId)
     }
 
     override fun describeContents(): Int {

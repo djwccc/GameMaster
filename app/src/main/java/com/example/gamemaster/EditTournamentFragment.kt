@@ -42,6 +42,7 @@ class EditTournamentFragment : Fragment() {
     private var tournament: TournamentModel? = null
     private lateinit var matchRecyclerView: RecyclerView
     private lateinit var timeContainer: LinearLayout
+    private lateinit var matchAdapter: MatchAdapter
     private lateinit var matchList: MutableList<MatchModel>
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,7 +72,6 @@ class EditTournamentFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         matchList = mutableListOf()
-
         toolbar = view.findViewById(R.id.toolbar)
         (activity as AppCompatActivity).setSupportActionBar(toolbar)
         // 添加保存按钮
@@ -108,16 +108,31 @@ class EditTournamentFragment : Fragment() {
         matchRecyclerView = view.findViewById(R.id.rv_matches)
         matchRecyclerView.layoutManager = LinearLayoutManager(requireContext())
 
-        val matchList = tournament?.generatedMatches ?: emptyList()
+        val matchList = (tournament?.generatedMatches ?: emptyList()).toMutableList()
 
         // 将赛程按时间排序
         val sortedMatchList = matchList.sortedBy { it.matchTime }
 
         // 显示赛程
-        val matchAdapter = MatchAdapter(sortedMatchList) { match ->
-            openEditMatchFragment(match)
+        val matchAdapter = MatchAdapter(sortedMatchList.toMutableList()) { match ->
+            tournament?.let { openEditMatchFragment(it, match) }
         }
         matchRecyclerView.adapter = matchAdapter
+
+        parentFragmentManager.setFragmentResultListener(
+            "update_match_request",
+            viewLifecycleOwner
+        ) { _, result ->
+            val updatedMatch = result.getParcelable<MatchModel>("updated_match")
+            updatedMatch?.let { match ->
+                // 更新 matchList 中的对应比赛数据
+                val matchIndex = matchList.indexOfFirst { it.matchId == match.matchId }
+                if (matchIndex != -1) {
+                    matchList[matchIndex] = match
+                    matchAdapter.notifyItemChanged(matchIndex)
+                }
+            }
+        }
 
         // 初始化 UI 组件
         matchTypeSpinner = view.findViewById(R.id.spinnerMatchType)
@@ -401,7 +416,7 @@ class EditTournamentFragment : Fragment() {
     }
 
     companion object {
-        private const val ARG_TOURNAMENT = "tournament"
+        const val ARG_TOURNAMENT = "tournament"
 
         fun newInstance(tournament: TournamentModel): EditTournamentFragment {
             val fragment = EditTournamentFragment()
@@ -412,12 +427,12 @@ class EditTournamentFragment : Fragment() {
         }
     }
 
-    private fun openEditMatchFragment(match: MatchModel) {
-        val fragment = EditMatchFragment.newInstance(match) // 传递当前赛程的信息
-        requireActivity().supportFragmentManager.commit {
-            replace(R.id.fragment_container, fragment)
-            addToBackStack(null) // 允许用户返回到上一个 Fragment
-        }
+    private fun openEditMatchFragment(tournament:TournamentModel, match: MatchModel) {
+        val fragment = EditMatchFragment.newInstance(tournament, match) // 传递当前赛程的信息
+        parentFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .addToBackStack(null)
+            .commit()
     }
 
     private fun generateMatches(teams: List<String>, referees: List<String>, matchTimes: List<String>): MutableList<MatchModel> {
@@ -462,9 +477,9 @@ class EditTournamentFragment : Fragment() {
                 val referee = if (referees.isNotEmpty()) {
                     referees.random()  // 随机选择裁判员
                 } else "无裁判员"
-                matchList.add(MatchModel(matchId.toString(), matchTime, referee, teamA, teamB))
+                matchList.add(MatchModel(matchTime, referee, teamA, teamB, matchId.toString()))
+                matchId ++
                 matchTimeIndex++
-                matchId++
             }
         }
 

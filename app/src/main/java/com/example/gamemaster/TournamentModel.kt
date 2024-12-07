@@ -17,7 +17,8 @@ data class TournamentModel(
         parcel.readString() ?: "",
         parcel.readString() ?: "",
         parcel.readString() ?: "",
-        parcel.readString() ?: ""
+        parcel.readString() ?: "",
+        parcel.createTypedArrayList(MatchModel.CREATOR) ?: mutableListOf()
     )
 
     override fun equals(other: Any?): Boolean {
@@ -35,6 +36,7 @@ data class TournamentModel(
         parcel.writeString(teams)
         parcel.writeString(referees)
         parcel.writeString(matchTimes)
+        parcel.writeTypedList(generatedMatches)
     }
 
     override fun describeContents(): Int {
@@ -51,3 +53,4 @@ data class TournamentModel(
         }
     }
 }
+

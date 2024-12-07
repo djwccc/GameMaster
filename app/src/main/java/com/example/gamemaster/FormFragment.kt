@@ -366,9 +366,9 @@ class FormFragment : Fragment() {
                 val referee = if (referees.isNotEmpty()) {
                     referees.random()  // 随机选择裁判员
                     } else "无裁判员"
-                matchList.add(MatchModel(matchId.toString(), matchTime, referee, teamA, teamB))
+                matchList.add(MatchModel(matchTime, referee, teamA, teamB, matchId.toString()))
+                matchId ++
                 matchTimeIndex++
-                matchId++
             }
         }
 

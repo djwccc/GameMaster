@@ -16,6 +16,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import android.Manifest
+import android.widget.ImageView
 
 
 class MainActivity : AppCompatActivity() {
@@ -23,7 +24,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tournamentAdapter: TournamentAdapter
     private val tournamentList = mutableListOf<TournamentModel>()
     private lateinit var fab: FloatingActionButton
-//    private lateinit var adapter: TournamentAdapter
 
     @SuppressLint("NotifyDataSetChanged")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,6 +53,7 @@ class MainActivity : AppCompatActivity() {
                 fab.visibility = View.GONE
                 findViewById<androidx.appcompat.widget.LinearLayoutCompat>(R.id.linear_layout_compat).visibility =
                     View.GONE
+                findViewById<ImageView>(R.id.imageBackground).alpha = 0F
             }
         }
     }
@@ -62,6 +63,7 @@ class MainActivity : AppCompatActivity() {
         fab.visibility = View.VISIBLE
         findViewById<androidx.appcompat.widget.LinearLayoutCompat>(R.id.linear_layout_compat).visibility =
             View.VISIBLE
+        findViewById<ImageView>(R.id.imageBackground).alpha = 0.5F
         // 重新加载数据
         loadData()
     }
@@ -121,6 +123,7 @@ class MainActivity : AppCompatActivity() {
             fab.visibility = View.GONE
             findViewById<androidx.appcompat.widget.LinearLayoutCompat>(R.id.linear_layout_compat).visibility =
                 View.GONE
+            findViewById<ImageView>(R.id.imageBackground).alpha = 0F
         }
     }
 }

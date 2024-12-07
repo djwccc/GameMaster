@@ -7,7 +7,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
-class MatchAdapter(private var matchList: List<MatchModel>,
+class MatchAdapter(private var matchList: MutableList<MatchModel>,
                    private val onMatchClick: (MatchModel) -> Unit) :
     RecyclerView.Adapter<MatchAdapter.MatchViewHolder>() {
 
@@ -37,8 +37,10 @@ class MatchAdapter(private var matchList: List<MatchModel>,
     override fun getItemCount() = matchList.size
 
     @SuppressLint("NotifyDataSetChanged")
-    fun updateMatches(newMatches: List<MatchModel>) {
-        matchList = newMatches
+    // 用于刷新数据
+    fun updateMatches(newMatchList: List<MatchModel>) {
+        matchList.clear()
+        matchList.addAll(newMatchList)
         notifyDataSetChanged()
     }
 }
