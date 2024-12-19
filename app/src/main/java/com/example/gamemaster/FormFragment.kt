@@ -111,7 +111,7 @@ class FormFragment : Fragment() {
         matchTypeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         matchTypeSpinner.adapter = matchTypeAdapter
 
-        // 设置赛制选择器
+        // 设置比赛场地选择器
         val matchFormats = arrayOf("小组赛", "淘汰赛")
         val matchFormatAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, matchFormats)
         matchFormatAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
@@ -279,9 +279,6 @@ class FormFragment : Fragment() {
         }
         val refereesList = referees.joinToString(", ")
 
-        // 生成赛程并保存
-        val matchList = generateMatches(teams, referees, matchTimes)
-
         // 创建新的赛程对象
         val tournament = TournamentModel(
             tournamentName,
@@ -291,10 +288,7 @@ class FormFragment : Fragment() {
             refereesList,
             timesList
         )
-        tournament.generatedMatches = matchList // 保存赛程
         (activity as? MainActivity)?.addTournament(tournament)
-        // 保存赛程到 SharedPreferences
-        saveMatchesToSharedPreferences(tournament)
         // 保存数据
         saveData(tournament)
         // 反馈给用户
@@ -321,66 +315,6 @@ class FormFragment : Fragment() {
         // 将数据保存回 SharedPreferences
         val editor = sharedPreferences.edit()
         editor.putString("tournament_list", gson.toJson(tournamentList))
-        editor.apply()
-    }
-
-    private fun generateMatches(teams: List<String>, referees: List<String>, matchTimes: List<String>): MutableList<MatchModel> {
-        val matchList = mutableListOf<MatchModel>()
-        val totalMatches = teams.size * (teams.size - 1) / 2 // 总比赛场次
-        val availableMatchTimes = matchTimes.take(totalMatches) // 获取用户提供的可用比赛时间
-        var matchId = 0
-        var matchTimeIndex = 0
-
-        // 先将班级按顺序排列，避免重复使用同一班级
-        val teamPairs = mutableListOf<Pair<String, String>>()
-        for (i in teams.indices) {
-            for (j in i + 1 until teams.size) {
-                teamPairs.add(Pair(teams[i], teams[j])) // 将所有班级配对
-            }
-        }
-
-        // 现在我们需要将配对的班级错开安排
-        val shuffledTeamPairs = teamPairs.shuffled() // 随机打乱班级配对
-        val matchTimeGroups = mutableListOf<MutableList<Pair<String, String>>>()
-
-        // 将所有配对分成不同的组别，每组间隔一定天数
-        var groupIndex = 0
-        for (pair in shuffledTeamPairs) {
-            if (groupIndex >= matchTimeGroups.size) {
-                matchTimeGroups.add(mutableListOf())
-            }
-            matchTimeGroups[groupIndex].add(pair)
-            groupIndex = (groupIndex + 1) % availableMatchTimes.size // 每组比赛使用不同的时间
-        }
-
-        // 为每个比赛安排时间和裁判
-        for (group in matchTimeGroups) {
-            for (pair in group) {
-                val teamA = pair.first
-                val teamB = pair.second
-                val matchTime = if (matchTimeIndex < availableMatchTimes.size) {
-                    availableMatchTimes[matchTimeIndex] // 从用户提供的时间中取
-                } else {
-                    "未安排"
-                }
-                val referee = if (referees.isNotEmpty()) {
-                    referees.random()  // 随机选择裁判员
-                    } else "无裁判员"
-                matchList.add(MatchModel(matchTime, referee, teamA, teamB, matchId.toString()))
-                matchId ++
-                matchTimeIndex++
-            }
-        }
-
-        return matchList.sortedBy { it.matchTime }.toMutableList() // 根据 matchTime 排序
-    }
-
-    private fun saveMatchesToSharedPreferences(tournament: TournamentModel) {
-        val sharedPreferences = requireContext().getSharedPreferences("tournament_data", Context.MODE_PRIVATE)
-        val gson = Gson()
-        val editor = sharedPreferences.edit()
-        val json = gson.toJson(tournament)
-        editor.putString("tournament", json)
         editor.apply()
     }
 }
