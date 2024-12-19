@@ -7,7 +7,6 @@ import android.app.TimePickerDialog
 import android.content.Context
 import android.icu.util.Calendar
 import android.os.Bundle
-import android.util.Log
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.Menu
@@ -21,14 +20,11 @@ import android.widget.LinearLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
-import androidx.annotation.OptIn
 import androidx.appcompat.widget.Toolbar
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.util.Pair
-import androidx.fragment.app.commit
-import androidx.media3.common.util.UnstableApi
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.example.gamemaster.databinding.FragmentEditTournamentBinding
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.gson.Gson
@@ -42,8 +38,11 @@ class EditTournamentFragment : Fragment() {
     private var tournament: TournamentModel? = null
     private lateinit var matchRecyclerView: RecyclerView
     private lateinit var timeContainer: LinearLayout
-    private lateinit var matchAdapter: MatchAdapter
-    private lateinit var matchList: MutableList<MatchModel>
+    private lateinit var matchAdapter: GroupMatchAdapter
+    private lateinit var btnGenerateGroup: Button
+    private lateinit var rvGroups: RecyclerView
+    private var _binding: FragmentEditTournamentBinding? = null
+    private val binding get() = _binding!!
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,14 +63,18 @@ class EditTournamentFragment : Fragment() {
         arguments?.let {
             tournament = it.getParcelable(ARG_TOURNAMENT)
         }
+        _binding = FragmentEditTournamentBinding.inflate(inflater, container, false)
+        return binding.root
+    }
 
-        return inflater.inflate(R.layout.fragment_edit_tournament, container, false) // 使用与添加赛程相同的布局
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        matchList = mutableListOf()
         toolbar = view.findViewById(R.id.toolbar)
         (activity as AppCompatActivity).setSupportActionBar(toolbar)
         // 添加保存按钮
@@ -85,7 +88,14 @@ class EditTournamentFragment : Fragment() {
                 }
                 R.id.action_delete -> {
                     // 处理删除赛程逻辑
-                    deleteTournament()
+                    AlertDialog.Builder(requireContext())
+                        .setTitle("确认删除赛程?")
+                        .setMessage("您确定要将此赛程全部删除吗？删除后不可恢复。")
+                        .setPositiveButton("确定") { _, _ ->
+                            deleteTournament()
+                        }
+                        .setNegativeButton("取消", null)
+                        .show()
                     true
                 }
                 else -> false
@@ -97,41 +107,62 @@ class EditTournamentFragment : Fragment() {
             requireActivity().supportFragmentManager.popBackStack() // 退出 Fragment
         }
 
+        // 小组赛分组
+        rvGroups = view.findViewById(R.id.rv_groups)
+        rvGroups.layoutManager = LinearLayoutManager(requireContext())
+        matchRecyclerView = view.findViewById(R.id.rvMatches)
+        btnGenerateGroup = view.findViewById(R.id.btn_generate_group)
+
+        // 显示当前 Tournament 的赛程
+        tournament?.let {
+            val matches = it.generatedMatches
+            val groups = it.groups
+            Toast.makeText(requireContext(), "${matches},${groups}", Toast.LENGTH_SHORT).show()
+            if (!matches.isNullOrEmpty() && !groups.isNullOrEmpty()) {
+                Toast.makeText(requireContext(), "已加载赛程", Toast.LENGTH_SHORT).show()
+                btnGenerateGroup.visibility = View.GONE
+                val matchAdapter = GroupMatchAdapter(tournament!!.generatedMatches ?: mutableListOf(),
+                    {match -> showTimePickerDialog(match)})
+                binding.rvMatches.layoutManager = LinearLayoutManager(requireContext())
+                binding.rvMatches.adapter = matchAdapter
+                val groupAdapter = GroupAdapter(tournament!!.groups ?: emptyMap())
+                binding.rvGroups.layoutManager = LinearLayoutManager(requireContext())
+                binding.rvGroups.adapter = groupAdapter
+
+                val sharedPreferences = requireContext().getSharedPreferences("tournament_prefs", Context.MODE_PRIVATE)
+                val editor = sharedPreferences.edit()
+                editor.putBoolean("isGroupGenerated_${tournament?.tournamentName}", false)
+                editor.apply()
+            }
+            else {
+                btnGenerateGroup.visibility = View.VISIBLE
+                btnGenerateGroup.setOnClickListener {
+                    val groups = generateGroups(tournament!!.teams.split(", "))  // teams 为从 TournamentModel 中获取的参赛队伍列表
+                    val matches = generateGroupMatches(groups)
+                    tournament!!.groups = groups
+                    tournament!!.generatedMatches = matches.toMutableList()
+                    btnGenerateGroup.visibility = View.GONE
+                    val matchAdapter = GroupMatchAdapter(tournament!!.generatedMatches ?: mutableListOf(),
+                        {match -> showTimePickerDialog(match)})
+                    binding.rvMatches.layoutManager = LinearLayoutManager(requireContext())
+                    binding.rvMatches.adapter = matchAdapter
+                    val groupAdapter = GroupAdapter(tournament!!.groups ?: emptyMap())
+                    binding.rvGroups.layoutManager = LinearLayoutManager(requireContext())
+                    binding.rvGroups.adapter = groupAdapter
+
+                    val sharedPreferences = requireContext().getSharedPreferences("tournament_prefs", Context.MODE_PRIVATE)
+                    val editor = sharedPreferences.edit()
+                    editor.putBoolean("isGroupGenerated_${tournament?.tournamentName}", true)
+                    editor.apply()
+                }
+            }
+        }
+
         // 时间选择
         timeContainer = view.findViewById(R.id.timeContainer)
         val btnAddTime: Button = view.findViewById(R.id.btnAddTime)
         btnAddTime.setOnClickListener {
             showDateTimePicker()
-        }
-
-        // 加载赛程
-        matchRecyclerView = view.findViewById(R.id.rv_matches)
-        matchRecyclerView.layoutManager = LinearLayoutManager(requireContext())
-
-        val matchList = (tournament?.generatedMatches ?: emptyList()).toMutableList()
-
-        // 将赛程按时间排序
-        val sortedMatchList = matchList.sortedBy { it.matchTime }
-
-        // 显示赛程
-        val matchAdapter = MatchAdapter(sortedMatchList.toMutableList()) { match ->
-            tournament?.let { openEditMatchFragment(it, match) }
-        }
-        matchRecyclerView.adapter = matchAdapter
-
-        parentFragmentManager.setFragmentResultListener(
-            "update_match_request",
-            viewLifecycleOwner
-        ) { _, result ->
-            val updatedMatch = result.getParcelable<MatchModel>("updated_match")
-            updatedMatch?.let { match ->
-                // 更新 matchList 中的对应比赛数据
-                val matchIndex = matchList.indexOfFirst { it.matchId == match.matchId }
-                if (matchIndex != -1) {
-                    matchList[matchIndex] = match
-                    matchAdapter.notifyItemChanged(matchIndex)
-                }
-            }
         }
 
         // 初始化 UI 组件
@@ -272,6 +303,9 @@ class EditTournamentFragment : Fragment() {
     // 保存修改后的赛程
     @SuppressLint("CutPasteId")
     private fun saveTournament() {
+        val sharedPreferences = requireContext().getSharedPreferences("tournament_prefs", Context.MODE_PRIVATE)
+        val isGroupGenerated = sharedPreferences.getBoolean("isGroupGenerated_${tournament?.tournamentName}", false)
+
         // 获取更新后的赛程信息
         val tournamentName = view?.findViewById<EditText>(R.id.editTextTournamentName)?.text.toString()
         val selectedMatchType = matchTypeSpinner.selectedItem.toString()
@@ -280,7 +314,8 @@ class EditTournamentFragment : Fragment() {
         if (
             tournamentName!=tournament!!.tournamentName
             || selectedMatchFormat!=tournament!!.matchFormat
-            || selectedMatchType!=tournament!!.matchType){
+            || selectedMatchType!=tournament!!.matchType
+            || isGroupGenerated){
             isChangedInfo = true
         }
         // 获取原信息，判断是否有改动
@@ -289,6 +324,7 @@ class EditTournamentFragment : Fragment() {
         }
         val originTeams = tournament?.teams?.split(", ")?.toMutableList()
         val originReferees = tournament?.referees?.split(", ")?.toMutableList()
+        val originTimes = tournament?.matchTimes?.split(", ")?.toMutableList()
 
         // 获取参与的队伍
         val teams = mutableListOf<String>()
@@ -298,9 +334,6 @@ class EditTournamentFragment : Fragment() {
             teams.add(chip.text.toString())
         }
         val teamsList = teams.joinToString(", ") // 用逗号分隔的队伍列表
-        if (teamsList != originTeams?.joinToString(", ")){
-            isChangedInfo = true
-        }
 
         // 获取裁判员列表
         val referees = mutableListOf<String>()
@@ -310,9 +343,6 @@ class EditTournamentFragment : Fragment() {
             referees.add(chip.text.toString())
         }
         val refereesList = referees.joinToString(", ") // 用逗号分隔的队伍列表
-        if (refereesList != originReferees?.joinToString(", ")){
-            isChangedInfo = true
-        }
 
         // 获取比赛时间
         val matchTimes = mutableListOf<String>()
@@ -323,10 +353,23 @@ class EditTournamentFragment : Fragment() {
         }
         val timesList = matchTimes.joinToString(", ") // 用逗号分隔的时间列表
 
+        if (timesList != originTimes?.joinToString(", ")
+            || refereesList != originReferees?.joinToString(", ")
+            || teamsList != originTeams?.joinToString(", ")){
+            isChangedInfo = true
+        }
+
+        // 动态设置提示信息
+        val message = if (isGroupGenerated) {
+            "比赛队伍已经进行分组，赛程已经生成，是否保存？"
+        } else {
+            "您已修改赛程信息，是否保存？现有数据将被覆盖，比赛将重置，无法恢复。"
+        }
+
         if (isChangedInfo){
             AlertDialog.Builder(requireContext())
                 .setTitle("保存修改?")
-                .setMessage("您已修改了赛程信息。如果保存，赛程将会自动重新生成。")
+                .setMessage(message)
                 .setPositiveButton("保存") { _, _ ->
                     // 更新赛程对象
                     tournament?.let {
@@ -335,14 +378,10 @@ class EditTournamentFragment : Fragment() {
                         it.teams = teamsList
                         it.referees = refereesList
                         it.matchTimes = timesList
-
-                        val matchList = generateMatches(
-                            tournament?.teams?.split(", ") ?: emptyList(),
-                            tournament?.referees?.split(", ") ?: emptyList(),
-                            tournament?.matchTimes?.split(", ") ?: emptyList()
-                        )
-                        tournament?.generatedMatches = matchList // 更新赛程
-
+                        if (!isGroupGenerated) {
+                            it.groups = mapOf() // 清空
+                            it.generatedMatches = mutableListOf()
+                        }
                         // 更新 SharedPreferences 中的数据
                         updateTournament(it)
 
@@ -379,6 +418,8 @@ class EditTournamentFragment : Fragment() {
             // 更新 SharedPreferences 中的数据
             val editor = sharedPreferences.edit()
             editor.putString("tournament_list", gson.toJson(tournamentList))
+            editor.apply()
+            editor.putString("group_match_list", gson.toJson(tournamentList))
             editor.apply()
 
             Toast.makeText(requireContext(), "赛程已删除", Toast.LENGTH_SHORT).show()
@@ -427,62 +468,104 @@ class EditTournamentFragment : Fragment() {
         }
     }
 
-    private fun openEditMatchFragment(tournament:TournamentModel, match: MatchModel) {
-        val fragment = EditMatchFragment.newInstance(tournament, match) // 传递当前赛程的信息
-        parentFragmentManager.beginTransaction()
-            .replace(R.id.fragment_container, fragment)
-            .addToBackStack(null)
-            .commit()
+    // 抽签分组的函数
+    private fun generateGroups(teams: List<String>): Map<String, List<String>> {
+        val shuffledTeams = teams.shuffled()
+        val groups = mutableMapOf<String, MutableList<String>>()
+
+        // 按顺序分组：A组、B组、C组、D组
+        val groupNames = arrayOf("A组", "B组", "C组", "D组")
+
+        for ((index, team) in shuffledTeams.withIndex()) {
+            val groupIndex = index % groupNames.size
+            val groupName = groupNames[groupIndex]
+            if (!groups.containsKey(groupName)) {
+                groups[groupName] = mutableListOf()
+            }
+            groups[groupName]?.add(team)
+        }
+
+        tournament!!.groups = groups
+        return groups
     }
 
-    private fun generateMatches(teams: List<String>, referees: List<String>, matchTimes: List<String>): MutableList<MatchModel> {
-        val matchList = mutableListOf<MatchModel>()
-        val totalMatches = teams.size * (teams.size - 1) / 2 // 总比赛场次
-        val availableMatchTimes = matchTimes.take(totalMatches) // 获取用户提供的可用比赛时间
+    // 生成小组赛赛程
+    private fun generateGroupMatches(groups: Map<String, List<String>>): List<GroupMatchModel> {
+        val matchList = mutableListOf<GroupMatchModel>()
+        val matchTimes = tournament!!.matchTimes.split(", ")
+        val referees = tournament!!.referees.split(", ")
         var matchId = 0
-        var matchTimeIndex = 0
+        var timeIndex = 0
+        val groupNames = groups.keys.toList()
 
-        // 先将班级按顺序排列，避免重复使用同一班级
-        val teamPairs = mutableListOf<Pair<String, String>>()
-        for (i in teams.indices) {
-            for (j in i + 1 until teams.size) {
-                teamPairs.add(Pair(teams[i], teams[j])) // 将所有班级配对
-            }
-        }
+        // 遍历每个小组，生成小组赛赛程
+        for (groupName in groupNames) {
+            val groupTeams = groups[groupName] ?: continue
+            for (i in groupTeams.indices) {
+                for (j in i + 1 until groupTeams.size) {
+                    val teamA = groupTeams[i]
+                    val teamB = groupTeams[j]
+                    val matchTime = matchTimes.getOrElse(timeIndex % matchTimes.size) { "未安排" }
+                    val referee = referees.random()
 
-        // 现在我们需要将配对的班级错开安排
-        val shuffledTeamPairs = teamPairs.shuffled() // 随机打乱班级配对
-        val matchTimeGroups = mutableListOf<MutableList<Pair<String, String>>>()
+                    // 创建比赛对象
+                    val matchModel = GroupMatchModel(
+                        group = groupName,
+                        matchTime = matchTime,
+                        referee = referee,
+                        teamA = teamA,
+                        teamB = teamB,
+                        matchId = matchId.toString()
+                    )
 
-        // 将所有配对分成不同的组别，每组间隔一定天数
-        var groupIndex = 0
-        for (pair in shuffledTeamPairs) {
-            if (groupIndex >= matchTimeGroups.size) {
-                matchTimeGroups.add(mutableListOf())
-            }
-            matchTimeGroups[groupIndex].add(pair)
-            groupIndex = (groupIndex + 1) % availableMatchTimes.size // 每组比赛使用不同的时间
-        }
-
-        // 为每个比赛安排时间和裁判
-        for (group in matchTimeGroups) {
-            for (pair in group) {
-                val teamA = pair.first
-                val teamB = pair.second
-                val matchTime = if (matchTimeIndex < availableMatchTimes.size) {
-                    availableMatchTimes[matchTimeIndex] // 从用户提供的时间中取
-                } else {
-                    "未安排"
+                    matchList.add(matchModel)
+                    timeIndex = (timeIndex + 1) % matchTimes.size
+                    matchId ++
                 }
-                val referee = if (referees.isNotEmpty()) {
-                    referees.random()  // 随机选择裁判员
-                } else "无裁判员"
-                matchList.add(MatchModel(matchTime, referee, teamA, teamB, matchId.toString()))
-                matchId ++
-                matchTimeIndex++
             }
         }
+        tournament!!.generatedMatches!!.clear()
+        tournament!!.generatedMatches!!.addAll(matchList)
+        return matchList
+    }
 
-        return matchList.sortedBy { it.matchTime }.toMutableList() // 根据 matchTime 排序
+    @SuppressLint("NotifyDataSetChanged", "DefaultLocale")
+    private fun showTimePickerDialog(match: GroupMatchModel) {
+        val calendar = Calendar.getInstance()
+        val timePickerDialog = TimePickerDialog(
+            requireContext(),
+            { _, hourOfDay, minute ->
+                val newTime = String.format("%02d:%02d", hourOfDay, minute)
+                match.matchTime = newTime // 修改时间
+                updateMatchInSharedPreferences(match) // 保存到 SharedPreferences
+                matchAdapter.notifyDataSetChanged() // 更新UI
+            },
+            calendar.get(Calendar.HOUR_OF_DAY),
+            calendar.get(Calendar.MINUTE),
+            true
+        )
+        timePickerDialog.show()
+    }
+
+    private fun updateMatchInSharedPreferences(match: GroupMatchModel) {
+        val sharedPreferences = requireContext().getSharedPreferences("tournament_data", Context.MODE_PRIVATE)
+        val gson = Gson()
+        val json = sharedPreferences.getString("match_list", null)
+
+        val type = object : TypeToken<MutableList<GroupMatchModel>>() {}.type
+        val matchList: MutableList<GroupMatchModel> = if (json != null) {
+            gson.fromJson(json, type)
+        } else {
+            mutableListOf()
+        }
+
+        val index = matchList.indexOfFirst { it.teamA == match.teamA && it.teamB == match.teamB }
+        if (index != -1) {
+            matchList[index] = match // 更新时间
+        }
+
+        val editor = sharedPreferences.edit()
+        editor.putString("match_list", gson.toJson(matchList))
+        editor.apply()
     }
 }
