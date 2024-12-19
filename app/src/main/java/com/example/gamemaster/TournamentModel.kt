@@ -9,8 +9,7 @@ data class TournamentModel(
     var teams: String,
     var referees: String,
     var matchTimes: String,
-    var groups: Map<String, List<String>>? = null,
-    var generatedMatches: MutableList<GroupMatchModel>? = mutableListOf()
+    var generatedMatches: MutableList<MatchModel>? = mutableListOf()
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
         parcel.readString() ?: "",
@@ -19,7 +18,8 @@ data class TournamentModel(
         parcel.readString() ?: "",
         parcel.readString() ?: "",
         parcel.readString() ?: "",
-        )
+        parcel.createTypedArrayList(MatchModel.CREATOR) ?: mutableListOf()
+    )
 
     override fun equals(other: Any?): Boolean {
         return (other is TournamentModel) && (tournamentName == other.tournamentName)

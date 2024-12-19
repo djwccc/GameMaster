@@ -70,7 +70,6 @@ dependencies {
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.firebase.crashlytics)
     implementation(libs.media3.common.ktx)
-    implementation(libs.androidx.recyclerview)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

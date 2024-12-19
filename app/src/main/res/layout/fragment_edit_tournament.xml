@@ -4,7 +4,6 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:orientation="vertical">
 
     <androidx.appcompat.widget.Toolbar
@@ -134,40 +133,11 @@
                 android:backgroundTint="@color/design_default_color_primary_variant" />
 
             <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rv_groups"
+                android:id="@+id/rv_matches"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"/>
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvMatches"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                tools:listitem="@layout/item_group_match" />
-
-            <!-- 小组赛分组按钮 -->
-            <Button
-                android:id="@+id/btn_generate_group"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_margin="16dp"
-                android:text="进行小组赛分组"
-                android:textColor="@android:color/white"
-                android:layout_gravity="bottom"/>
-
-            <ScrollView
-                android:id="@+id/scroll_bracket"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:visibility="gone">
-
-                <LinearLayout
-                    android:id="@+id/linear_bracket"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp" />
-            </ScrollView>
+                android:layout_marginTop="16dp"
+                android:padding="8dp" />
 
             </LinearLayout>
 
