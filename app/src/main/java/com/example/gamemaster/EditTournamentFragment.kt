@@ -33,7 +33,8 @@ import com.google.gson.reflect.TypeToken
 class EditTournamentFragment : Fragment() {
 
     private lateinit var matchTypeSpinner: Spinner
-    private lateinit var matchFormatSpinner: Spinner
+    private lateinit var playingFieldsContainer: LinearLayout
+    private lateinit var btnAddPlayingField: Button
     private lateinit var toolbar: Toolbar
     private var tournament: TournamentModel? = null
     private lateinit var matchRecyclerView: RecyclerView
@@ -58,7 +59,7 @@ class EditTournamentFragment : Fragment() {
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View? {
+    ): View {
         // 获取传递的 TournamentModel 对象
         arguments?.let {
             tournament = it.getParcelable(ARG_TOURNAMENT)
@@ -113,16 +114,18 @@ class EditTournamentFragment : Fragment() {
         matchRecyclerView = view.findViewById(R.id.rvMatches)
         btnGenerateGroup = view.findViewById(R.id.btn_generate_group)
 
+        matchAdapter = GroupMatchAdapter(tournament!!.generatedMatches ?: mutableListOf(),
+            {match -> showEditMatchDialog(match)})
+
         // 显示当前 Tournament 的赛程
         tournament?.let {
             val matches = it.generatedMatches
             val groups = it.groups
-            Toast.makeText(requireContext(), "${matches},${groups}", Toast.LENGTH_SHORT).show()
             if (!matches.isNullOrEmpty() && !groups.isNullOrEmpty()) {
                 Toast.makeText(requireContext(), "已加载赛程", Toast.LENGTH_SHORT).show()
                 btnGenerateGroup.visibility = View.GONE
                 val matchAdapter = GroupMatchAdapter(tournament!!.generatedMatches ?: mutableListOf(),
-                    {match -> showTimePickerDialog(match)})
+                    {match -> showEditMatchDialog(match)})
                 binding.rvMatches.layoutManager = LinearLayoutManager(requireContext())
                 binding.rvMatches.adapter = matchAdapter
                 val groupAdapter = GroupAdapter(tournament!!.groups ?: emptyMap())
@@ -143,7 +146,7 @@ class EditTournamentFragment : Fragment() {
                     tournament!!.generatedMatches = matches.toMutableList()
                     btnGenerateGroup.visibility = View.GONE
                     val matchAdapter = GroupMatchAdapter(tournament!!.generatedMatches ?: mutableListOf(),
-                        {match -> showTimePickerDialog(match)})
+                        {match -> showEditMatchDialog(match)})
                     binding.rvMatches.layoutManager = LinearLayoutManager(requireContext())
                     binding.rvMatches.adapter = matchAdapter
                     val groupAdapter = GroupAdapter(tournament!!.groups ?: emptyMap())
@@ -167,13 +170,21 @@ class EditTournamentFragment : Fragment() {
 
         // 初始化 UI 组件
         matchTypeSpinner = view.findViewById(R.id.spinnerMatchType)
-        matchFormatSpinner = view.findViewById(R.id.spinnerMatchFormat)
+        playingFieldsContainer = view.findViewById(R.id.playingFieldsContainer)
+        btnAddPlayingField = view.findViewById(R.id.btnAddPlayingField)
         val teamsEditText: EditText = view.findViewById(R.id.editTextTeams)
         val refereeEditText: EditText = view.findViewById(R.id.editTextReferee)
         val btnAddTeam: Button = view.findViewById(R.id.btnAddTeam)
         val chipGroupTeams: ChipGroup = view.findViewById(R.id.chipGroupTeams)
         val btnAddReferee: Button = view.findViewById(R.id.btnAddReferee)
         val chipGroupReferees: ChipGroup = view.findViewById(R.id.chipGroupReferees)
+
+        // 动态添加比赛场地
+        btnAddPlayingField.setOnClickListener {
+            addPlayingFieldInput()
+        }
+        // 加载已有的比赛场地
+        loadPlayingFields()
 
         // 设置 Spinner 选项
         setupSpinners()
@@ -186,16 +197,50 @@ class EditTournamentFragment : Fragment() {
         setupChipGroupListeners(btnAddReferee, refereeEditText, chipGroupReferees)
     }
 
+    private fun addPlayingFieldInput(fieldName: String = "") {
+        val fieldLayout = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(0, 8, 0, 8)
+        }
+
+        val editText = EditText(requireContext()).apply {
+            hint = "请输入比赛场地名称"
+            setText(fieldName)
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+
+        val deleteButton = Button(requireContext()).apply {
+            text = "删除"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setOnClickListener {
+                playingFieldsContainer.removeView(fieldLayout)
+            }
+        }
+
+        fieldLayout.addView(editText)
+        fieldLayout.addView(deleteButton)
+        playingFieldsContainer.addView(fieldLayout)
+    }
+
+    private fun loadPlayingFields() {
+        val playingFields = tournament?.playingFields?.split(", ") ?: emptyList()
+        for (field in playingFields) {
+            addPlayingFieldInput(field)
+        }
+    }
+
     private fun setupSpinners() {
         val matchTypes = arrayOf("羽毛球", "足球", "篮球", "乒乓球", "排球", "毽球")
         val matchTypeAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, matchTypes)
         matchTypeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         matchTypeSpinner.adapter = matchTypeAdapter
-
-        val matchFormats = arrayOf("小组赛", "淘汰赛")
-        val matchFormatAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, matchFormats)
-        matchFormatAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        matchFormatSpinner.adapter = matchFormatAdapter
     }
 
     private fun displayTournamentDetails(tournament: TournamentModel) {
@@ -203,7 +248,6 @@ class EditTournamentFragment : Fragment() {
         tournament.let {
             tournamentNameEditText.setText(it.tournamentName)
             matchTypeSpinner.setSelection((matchTypeSpinner.adapter as ArrayAdapter<String>).getPosition(it.matchType))
-            matchFormatSpinner.setSelection((matchFormatSpinner.adapter as ArrayAdapter<String>).getPosition(it.matchFormat))
 
             // 分析参与队伍和裁判员
             val teams = it.teams.split(", ").toMutableList()
@@ -309,11 +353,9 @@ class EditTournamentFragment : Fragment() {
         // 获取更新后的赛程信息
         val tournamentName = view?.findViewById<EditText>(R.id.editTextTournamentName)?.text.toString()
         val selectedMatchType = matchTypeSpinner.selectedItem.toString()
-        val selectedMatchFormat = matchFormatSpinner.selectedItem.toString()
         var isChangedInfo = false
         if (
             tournamentName!=tournament!!.tournamentName
-            || selectedMatchFormat!=tournament!!.matchFormat
             || selectedMatchType!=tournament!!.matchType
             || isGroupGenerated){
             isChangedInfo = true
@@ -353,9 +395,22 @@ class EditTournamentFragment : Fragment() {
         }
         val timesList = matchTimes.joinToString(", ") // 用逗号分隔的时间列表
 
+        // 获取比赛场地
+        val playingFields = mutableListOf<String>()
+        for (i in 0 until playingFieldsContainer.childCount) {
+            val fieldLayout = playingFieldsContainer.getChildAt(i) as LinearLayout
+            val editText = fieldLayout.getChildAt(0) as EditText
+            val fieldName = editText.text.toString()
+            if (fieldName.isNotEmpty()) {
+                playingFields.add(fieldName)
+            }
+        }
+        val playingFieldsList = playingFields.joinToString(", ")
+
         if (timesList != originTimes?.joinToString(", ")
             || refereesList != originReferees?.joinToString(", ")
-            || teamsList != originTeams?.joinToString(", ")){
+            || teamsList != originTeams?.joinToString(", ")
+            || playingFieldsList != tournament?.playingFields){
             isChangedInfo = true
         }
 
@@ -374,7 +429,7 @@ class EditTournamentFragment : Fragment() {
                     // 更新赛程对象
                     tournament?.let {
                         it.matchType = selectedMatchType
-                        it.matchFormat = selectedMatchFormat
+                        it.playingFields = playingFieldsList
                         it.teams = teamsList
                         it.referees = refereesList
                         it.matchTimes = timesList
@@ -493,6 +548,7 @@ class EditTournamentFragment : Fragment() {
     private fun generateGroupMatches(groups: Map<String, List<String>>): List<GroupMatchModel> {
         val matchList = mutableListOf<GroupMatchModel>()
         val matchTimes = tournament!!.matchTimes.split(", ")
+        val playingFields = tournament!!.playingFields.split(", ")
         val referees = tournament!!.referees.split(", ")
         var matchId = 0
         var timeIndex = 0
@@ -506,12 +562,14 @@ class EditTournamentFragment : Fragment() {
                     val teamA = groupTeams[i]
                     val teamB = groupTeams[j]
                     val matchTime = matchTimes.getOrElse(timeIndex % matchTimes.size) { "未安排" }
+                    val playingField = playingFields.random()
                     val referee = referees.random()
 
                     // 创建比赛对象
                     val matchModel = GroupMatchModel(
                         group = groupName,
                         matchTime = matchTime,
+                        playingField = playingField,
                         referee = referee,
                         teamA = teamA,
                         teamB = teamB,
@@ -545,6 +603,49 @@ class EditTournamentFragment : Fragment() {
             true
         )
         timePickerDialog.show()
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    private fun showEditMatchDialog(match: GroupMatchModel) {
+        val dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_edit_match, null)
+        val editTime = dialogView.findViewById<EditText>(R.id.editMatchTime)
+        val editField = dialogView.findViewById<EditText>(R.id.editPlayingField)
+
+        editTime.setText(match.matchTime)
+        editField.setText(match.playingField)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("编辑比赛")
+            .setView(dialogView)
+            .setPositiveButton("保存") { _, _ ->
+                val newTime = editTime.text.toString()
+                val newField = editField.text.toString()
+                Toast.makeText(requireContext(), "$match", Toast.LENGTH_LONG).show()
+                if (newTime.isNotEmpty() && newField.isNotEmpty()) {
+                    match.matchTime = newTime
+                    match.playingField = newField
+                    saveUpdatedMatches() // 保存更新后的比赛
+                } else {
+                    Toast.makeText(requireContext(), "时间和场地不能为空", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    @SuppressLint("MutatingSharedPrefs")
+    private fun saveUpdatedMatches() {
+        val sharedPreferences = requireContext().getSharedPreferences("tournament_data", Context.MODE_PRIVATE)
+        val editor = sharedPreferences.edit()
+        val tournaments = sharedPreferences.getStringSet("tournament_list", mutableSetOf()) ?: mutableSetOf()
+
+        tournament?.let {
+            tournaments.remove(it.tournamentName)
+            tournaments.add(Gson().toJson(it))
+            editor.putStringSet("tournament_list", tournaments)
+            editor.apply()
+            Toast.makeText(requireContext(), "修改已保存", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun updateMatchInSharedPreferences(match: GroupMatchModel) {

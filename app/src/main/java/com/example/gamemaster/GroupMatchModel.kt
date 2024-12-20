@@ -5,6 +5,7 @@ import android.os.Parcelable
 data class GroupMatchModel(
     var group: String,
     var matchTime: String,
+    var playingField: String,
     var referee: String,
     var teamA: String,
     var teamB: String,
@@ -16,11 +17,13 @@ data class GroupMatchModel(
         parcel.readString() ?: "",
         parcel.readString() ?: "",
         parcel.readString() ?: "",
+        parcel.readString() ?: "",
         parcel.readString() ?: ""
     )
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {
         parcel.writeString(matchTime)
+        parcel.writeString(playingField)
         parcel.writeString(referee)
         parcel.writeString(teamA)
         parcel.writeString(teamB)

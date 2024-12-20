@@ -9,14 +9,14 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
 class GroupMatchAdapter(private var matchList: MutableList<GroupMatchModel>,
-                        private val onEditTime: (GroupMatchModel) -> Unit) :
+                        private val onEditMatch: (GroupMatchModel) -> Unit) :
     RecyclerView.Adapter<GroupMatchAdapter.GroupMatchViewHolder>() {
 
     class GroupMatchViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val matchTime: TextView = itemView.findViewById(R.id.tv_match_time)
+        val playingField: TextView = itemView.findViewById(R.id.tv_playing_field)
         val teams: TextView = itemView.findViewById(R.id.tv_teams)
         val referee: TextView = itemView.findViewById(R.id.tv_referee)
-        val editTimeButton: Button = itemView.findViewById(R.id.btn_edit_time)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): GroupMatchViewHolder {
@@ -28,20 +28,16 @@ class GroupMatchAdapter(private var matchList: MutableList<GroupMatchModel>,
     override fun onBindViewHolder(holder: GroupMatchViewHolder, position: Int) {
         val match = matchList[position]
         holder.matchTime.text = match.matchTime
+        holder.playingField.text = "比赛场地：${match.playingField}"
         holder.teams.text = "${match.teamA} vs ${match.teamB}"
         holder.referee.text = "裁判员: ${match.referee}"
 
-        holder.editTimeButton.setOnClickListener {
-            onEditTime(match) // 点击时回调
+        holder.itemView.setOnClickListener {
+            onEditMatch(match)
         }
+
     }
 
     override fun getItemCount() = matchList.size
 
-    // 更新数据的方法
-    fun updateData(newMatchList: List<GroupMatchModel>) {
-        matchList.clear()
-        matchList.addAll(newMatchList) // 添加新的数据
-        notifyDataSetChanged() // 通知列表刷新
-    }
 }

@@ -50,14 +50,23 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="赛制:"
-                android:textSize="20dp" />
+                android:text="比赛场地:"
+                android:textSize="20sp" />
 
-            <Spinner
-                android:id="@+id/spinnerMatchFormat"
+            <LinearLayout
+                android:id="@+id/playingFieldsContainer"
                 android:layout_width="match_parent"
-                android:minHeight="48dp"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp" />
+
+            <Button
+                android:id="@+id/btnAddPlayingField"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="添加比赛场地"
+                android:layout_marginTop="8dp"
+                android:backgroundTint="@color/design_default_color_primary_variant" />
 
             <EditText
                 android:id="@+id/editTextTeams"

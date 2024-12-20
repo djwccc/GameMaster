@@ -26,6 +26,13 @@
                 android:textStyle="bold" />
 
             <TextView
+                android:id="@+id/tv_playing_field"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="比赛场地："
+                android:textSize="16sp" />
+
+            <TextView
                 android:id="@+id/tv_teams"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -39,14 +46,6 @@
                 android:text="裁判：裁判名"
                 android:textSize="16sp" />
         </LinearLayout>
-
-        <!-- 右侧按钮 -->
-        <Button
-            android:id="@+id/btn_edit_time"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="编辑" />
 
     </LinearLayout>
 

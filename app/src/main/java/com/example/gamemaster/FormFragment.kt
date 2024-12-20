@@ -33,7 +33,8 @@ import androidx.core.util.Pair
 class FormFragment : Fragment() {
 
     private lateinit var matchTypeSpinner: Spinner
-    private lateinit var matchFormatSpinner: Spinner
+    private lateinit var playingFieldsContainer: LinearLayout
+    private lateinit var btnAddPlayingField: Button
     private lateinit var toolbar: Toolbar
     private lateinit var timeContainer: LinearLayout
     private lateinit var dateContainer: LinearLayout
@@ -80,12 +81,18 @@ class FormFragment : Fragment() {
 
         // 初始化 UI 组件和逻辑
         matchTypeSpinner = view.findViewById(R.id.spinnerMatchType)
-        matchFormatSpinner = view.findViewById(R.id.spinnerMatchFormat)
+        playingFieldsContainer = view.findViewById(R.id.playingFieldsContainer)
+        btnAddPlayingField = view.findViewById(R.id.btnAddPlayingFields)
         val refereeEditText: EditText = view.findViewById(R.id.editTextReferee)
         gradeInput = view.findViewById(R.id.editTextGrade)
         classCountInput = view.findViewById(R.id.editTextClassCount)
         val btnAddReferee: Button = view.findViewById(R.id.btnAddReferee)
         val chipGroupReferees: ChipGroup = view.findViewById(R.id.chipGroupReferees)
+
+        // 添加比赛场地按钮点击事件
+        btnAddPlayingField.setOnClickListener {
+            addPlayingFieldInput()
+        }
 
         // 添加裁判员添加按钮点击事件
         btnAddReferee.setOnClickListener {
@@ -110,12 +117,6 @@ class FormFragment : Fragment() {
         val matchTypeAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, matchTypes)
         matchTypeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         matchTypeSpinner.adapter = matchTypeAdapter
-
-        // 设置比赛场地选择器
-        val matchFormats = arrayOf("小组赛", "淘汰赛")
-        val matchFormatAdapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_item, matchFormats)
-        matchFormatAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        matchFormatSpinner.adapter = matchFormatAdapter
 
         // 添加保存按钮
         toolbar.inflateMenu(R.menu.fragment_from_menu)
@@ -241,10 +242,53 @@ class FormFragment : Fragment() {
         timeContainer.addView(timeLayout)
     }
 
+    private fun addPlayingFieldInput() {
+        val fieldLayout = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(0, 8, 0, 8)
+        }
+
+        val editText = EditText(requireContext()).apply {
+            hint = "请输入比赛场地名称"
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+
+        val deleteButton = Button(requireContext()).apply {
+            text = "删除"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setOnClickListener {
+                playingFieldsContainer.removeView(fieldLayout)
+            }
+        }
+
+        fieldLayout.addView(editText)
+        fieldLayout.addView(deleteButton)
+        playingFieldsContainer.addView(fieldLayout)
+    }
+
+    private fun savePlayingFields(): List<String> {
+        val playingFields = mutableListOf<String>()
+        for (i in 0 until playingFieldsContainer.childCount) {
+            val fieldLayout = playingFieldsContainer.getChildAt(i) as LinearLayout
+            val editText = fieldLayout.getChildAt(0) as EditText
+            val fieldName = editText.text.toString()
+            if (fieldName.isNotEmpty()) {
+                playingFields.add(fieldName)
+            }
+        }
+        return playingFields
+    }
+
     private fun saveTournament() {
         val tournamentName = view?.findViewById<EditText>(R.id.EditTournamentName)?.text.toString()
         val selectedMatchType = matchTypeSpinner.selectedItem.toString()
-        val selectedMatchFormat = matchFormatSpinner.selectedItem.toString()
         val classCount = classCountInput.text.toString().toIntOrNull()
         val grade = gradeInput.text.toString()
 
@@ -283,7 +327,7 @@ class FormFragment : Fragment() {
         val tournament = TournamentModel(
             tournamentName,
             selectedMatchType,
-            selectedMatchFormat,
+            savePlayingFields().joinToString(", "),
             teamsList,
             refereesList,
             timesList

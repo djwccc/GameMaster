@@ -5,7 +5,7 @@ import android.os.Parcelable
 data class TournamentModel(
     var tournamentName: String,
     var matchType: String,
-    var matchFormat: String,
+    var playingFields: String,
     var teams: String,
     var referees: String,
     var matchTimes: String,
@@ -32,7 +32,7 @@ data class TournamentModel(
     override fun writeToParcel(parcel: Parcel, flags: Int) {
         parcel.writeString(tournamentName)
         parcel.writeString(matchType)
-        parcel.writeString(matchFormat)
+        parcel.writeString(playingFields)
         parcel.writeString(teams)
         parcel.writeString(referees)
         parcel.writeString(matchTimes)

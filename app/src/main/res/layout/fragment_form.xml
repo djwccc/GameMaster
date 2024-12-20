@@ -51,11 +51,19 @@
                 android:text="比赛场地:"
                 android:textSize="20sp" />
 
-            <Spinner
-                android:id="@+id/spinnerMatchFormat"
+            <LinearLayout
+                android:id="@+id/playingFieldsContainer"
                 android:layout_width="match_parent"
-                android:minHeight="48dp"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btnAddPlayingFields"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="添加场地"
+                android:backgroundTint="@color/design_default_color_primary_variant"/>
 
             <!-- 年级输入框 -->
             <EditText
