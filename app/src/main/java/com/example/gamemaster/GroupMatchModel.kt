@@ -9,7 +9,10 @@ data class GroupMatchModel(
     var referee: String,
     var teamA: String,
     var teamB: String,
-    var matchId : String
+    var matchId : String,
+    var scoreA: Int? = null,
+    var scoreB: Int? = null,
+    var isFinished: Boolean = false
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
         parcel.readString() ?: "",
@@ -34,12 +37,12 @@ data class GroupMatchModel(
         return 0
     }
 
-    companion object CREATOR : Parcelable.Creator<MatchModel> {
-        override fun createFromParcel(parcel: Parcel): MatchModel {
-            return MatchModel(parcel)
+    companion object CREATOR : Parcelable.Creator<KnockoutMatchModel> {
+        override fun createFromParcel(parcel: Parcel): KnockoutMatchModel {
+            return KnockoutMatchModel(parcel)
         }
 
-        override fun newArray(size: Int): Array<MatchModel?> {
+        override fun newArray(size: Int): Array<KnockoutMatchModel?> {
             return arrayOfNulls(size)
         }
     }

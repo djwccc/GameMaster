@@ -10,7 +10,8 @@ data class TournamentModel(
     var referees: String,
     var matchTimes: String,
     var groups: Map<String, List<String>>? = null,
-    var generatedMatches: MutableList<GroupMatchModel>? = mutableListOf()
+    var generatedMatches: MutableList<GroupMatchModel>? = mutableListOf(),
+    var knockoutMatches: MutableList<KnockoutMatchModel>? = mutableListOf()
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
         parcel.readString() ?: "",

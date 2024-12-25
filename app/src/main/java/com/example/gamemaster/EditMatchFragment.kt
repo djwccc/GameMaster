@@ -1,9 +1,7 @@
 package com.example.gamemaster
 
-import android.app.AlertDialog
 import android.content.Context
 import android.os.Bundle
-import android.util.Log
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
@@ -11,9 +9,6 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.Spinner
-import android.widget.Toast
-import com.example.gamemaster.EditTournamentFragment.Companion
-import com.example.gamemaster.EditTournamentFragment.Companion.ARG_TOURNAMENT
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
@@ -25,11 +20,11 @@ class EditMatchFragment : Fragment() {
     private lateinit var timeSpinner: Spinner
     private lateinit var btnSave: Button
 
-    private lateinit var match: MatchModel
+    private lateinit var match: KnockoutMatchModel
     private lateinit var tournament: TournamentModel
 
     companion object {
-        fun newInstance(tournament: TournamentModel, match: MatchModel): EditMatchFragment {
+        fun newInstance(tournament: TournamentModel, match: KnockoutMatchModel): EditMatchFragment {
             val fragment = EditMatchFragment()
             val args = Bundle()
             args.putParcelable("tournament", tournament)
@@ -90,7 +85,7 @@ class EditMatchFragment : Fragment() {
         timeSpinner.adapter = timeAdapter
 
         // 设置当前比赛的信息到 Spinner
-        val match = arguments?.getParcelable<MatchModel>("match")
+        val match = arguments?.getParcelable<KnockoutMatchModel>("match")
         refereeSpinner.setSelection(refereeAdapter.getPosition(match?.referee))
         teamASpinner.setSelection(teamAAdapter.getPosition(match?.teamA))
         teamBSpinner.setSelection(teamBAdapter.getPosition(match?.teamB))
@@ -113,7 +108,7 @@ class EditMatchFragment : Fragment() {
         val selectedTeamB = teamBSpinner.selectedItem.toString()
         val selectedTime = timeSpinner.selectedItem.toString()
 
-        val updatedMatch = arguments?.getParcelable<MatchModel>("match")?.copy(
+        val updatedMatch = arguments?.getParcelable<KnockoutMatchModel>("match")?.copy(
             referee = selectedReferee,
             teamA = selectedTeamA,
             teamB = selectedTeamB,
@@ -130,13 +125,13 @@ class EditMatchFragment : Fragment() {
         }
     }
 
-    private fun updateMatchInSharedPreferences(updatedMatch: MatchModel) {
+    private fun updateMatchInSharedPreferences(updatedMatch: KnockoutMatchModel) {
         val sharedPreferences = requireContext().getSharedPreferences("tournament_data", Context.MODE_PRIVATE)
         val gson = Gson()
         val json = sharedPreferences.getString("match_list", null)
 
-        val type = object : TypeToken<MutableList<MatchModel>>() {}.type
-        val matchList: MutableList<MatchModel> = if (json != null) {
+        val type = object : TypeToken<MutableList<KnockoutMatchModel>>() {}.type
+        val matchList: MutableList<KnockoutMatchModel> = if (json != null) {
             gson.fromJson(json, type)
         } else {
             mutableListOf()

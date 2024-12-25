@@ -4,15 +4,14 @@ import android.annotation.SuppressLint
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
-class GroupMatchAdapter(private var matchList: MutableList<GroupMatchModel>,
-                        private val onEditMatch: (GroupMatchModel) -> Unit) :
-    RecyclerView.Adapter<GroupMatchAdapter.GroupMatchViewHolder>() {
+class KnockoutMatchAdapter(private var matchList: MutableList<KnockoutMatchModel>,
+                        private val onEditMatch: (KnockoutMatchModel) -> Unit) :
+    RecyclerView.Adapter<KnockoutMatchAdapter.KnockoutMatchViewHolder>() {
 
-    class GroupMatchViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+    class KnockoutMatchViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val matchTime: TextView = itemView.findViewById(R.id.tv_match_time)
         val playingField: TextView = itemView.findViewById(R.id.tv_playing_field)
         val teams: TextView = itemView.findViewById(R.id.tv_teams)
@@ -20,13 +19,13 @@ class GroupMatchAdapter(private var matchList: MutableList<GroupMatchModel>,
         val scores: TextView = itemView.findViewById(R.id.tv_scores)
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): GroupMatchViewHolder {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): KnockoutMatchViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_group_match, parent, false)
-        return GroupMatchViewHolder(view)
+        return KnockoutMatchViewHolder(view)
     }
 
     @SuppressLint("SetTextI18n")
-    override fun onBindViewHolder(holder: GroupMatchViewHolder, position: Int) {
+    override fun onBindViewHolder(holder: KnockoutMatchViewHolder, position: Int) {
         val match = matchList[position]
         holder.matchTime.text = match.matchTime
         holder.playingField.text = "比赛场地：${match.playingField}"
