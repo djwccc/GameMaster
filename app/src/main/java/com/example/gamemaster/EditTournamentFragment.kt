@@ -117,63 +117,71 @@ class EditTournamentFragment : Fragment() {
 
         matchAdapter = GroupMatchAdapter(tournament!!.generatedMatches ?: mutableListOf(),
             {match -> showGroupScoreInputDialog(match)})
-
+        val matches = tournament!!.generatedMatches!!.toMutableList()
+        val isGroupFinished = matches.all { it.isFinished } && matches.isNotEmpty()
         // 显示当前 Tournament 的赛程
         tournament?.let {
-            val matches = it.generatedMatches
             val groups = it.groups
-            if (!matches.isNullOrEmpty() && !groups.isNullOrEmpty()) {
-                Toast.makeText(requireContext(), "已加载赛程", Toast.LENGTH_SHORT).show()
+            // 判断是否进入了淘汰赛
+            if (isGroupFinished) {
                 btnGenerateGroup.visibility = View.GONE
-                val matchAdapter = GroupMatchAdapter(tournament!!.generatedMatches ?: mutableListOf(),
-                    {match -> showGroupScoreInputDialog(match)})
+                // 刷新 RecyclerView 显示淘汰赛赛程
+                val matchAdapter =
+                    KnockoutMatchAdapter(tournament!!.knockoutMatches ?: mutableListOf(),
+                        { match -> showKnockoutScoreInputDialog(match) })
                 binding.rvMatches.layoutManager = LinearLayoutManager(requireContext())
                 binding.rvMatches.adapter = matchAdapter
-                val groupAdapter = GroupAdapter(tournament!!.groups ?: emptyMap())
-                binding.rvGroups.layoutManager = LinearLayoutManager(requireContext())
-                binding.rvGroups.adapter = groupAdapter
-
-                val sharedPreferences = requireContext().getSharedPreferences("tournament_prefs", Context.MODE_PRIVATE)
-                val editor = sharedPreferences.edit()
-                editor.putBoolean("isGroupGenerated_${tournament?.tournamentName}", false)
-                editor.apply()
             }
             else {
-                btnGenerateGroup.visibility = View.VISIBLE
-                btnGenerateGroup.setOnClickListener {
-                    val generateGroups = generateGroups(tournament!!.teams.split(", "))  // teams 为从 TournamentModel 中获取的参赛队伍列表
-                    val generateMatches = generateGroupMatches(generateGroups)
-                    tournament!!.groups = generateGroups
-                    tournament!!.generatedMatches = generateMatches.toMutableList()
+                if (matches.isNotEmpty() && !groups.isNullOrEmpty()) {
+                    Toast.makeText(requireContext(), "已加载赛程", Toast.LENGTH_SHORT).show()
                     btnGenerateGroup.visibility = View.GONE
-                    val matchAdapter = GroupMatchAdapter(tournament!!.generatedMatches ?: mutableListOf(),
-                        {match -> showGroupScoreInputDialog(match)})
+                    val matchAdapter =
+                        GroupMatchAdapter(tournament!!.generatedMatches ?: mutableListOf(),
+                            { match -> showGroupScoreInputDialog(match) })
                     binding.rvMatches.layoutManager = LinearLayoutManager(requireContext())
                     binding.rvMatches.adapter = matchAdapter
                     val groupAdapter = GroupAdapter(tournament!!.groups ?: emptyMap())
                     binding.rvGroups.layoutManager = LinearLayoutManager(requireContext())
                     binding.rvGroups.adapter = groupAdapter
 
-                    val sharedPreferences = requireContext().getSharedPreferences("tournament_prefs", Context.MODE_PRIVATE)
+                    val sharedPreferences = requireContext().getSharedPreferences(
+                        "tournament_prefs",
+                        Context.MODE_PRIVATE
+                    )
                     val editor = sharedPreferences.edit()
-                    editor.putBoolean("isGroupGenerated_${tournament?.tournamentName}", true)
+                    editor.putBoolean("isGroupGenerated_${tournament?.tournamentName}", false)
                     editor.apply()
                 }
-            }
-        }
+                    else if (matches.isEmpty() && groups.isNullOrEmpty()) {
+                    btnGenerateGroup.visibility = View.VISIBLE
+                    btnGenerateGroup.setOnClickListener {
+                        val generateGroups =
+                            generateGroups(tournament!!.teams.split(", "))  // teams 为从 TournamentModel 中获取的参赛队伍列表
+                        val generateMatches = generateGroupMatches(generateGroups)
+                        tournament!!.groups = generateGroups
+                        tournament!!.generatedMatches = generateMatches.toMutableList()
+                        btnGenerateGroup.visibility = View.GONE
+                        val matchAdapter =
+                            GroupMatchAdapter(tournament!!.generatedMatches ?: mutableListOf(),
+                                { match -> showGroupScoreInputDialog(match) })
+                        binding.rvMatches.layoutManager = LinearLayoutManager(requireContext())
+                        binding.rvMatches.adapter = matchAdapter
+                        val groupAdapter = GroupAdapter(tournament!!.groups ?: emptyMap())
+                        binding.rvGroups.layoutManager = LinearLayoutManager(requireContext())
+                        binding.rvGroups.adapter = groupAdapter
 
-//        btnGenerateKnockout = view.findViewById(R.id.btn_generate_knockout)
-//        // 淘汰赛
-//        btnGenerateKnockout.setOnClickListener {
-//            val knockoutTeams = getKnockoutTeams()
-//            if (knockoutTeams.size < 4) {
-//                Toast.makeText(requireContext(), "不足4支队伍进入淘汰赛", Toast.LENGTH_SHORT).show()
-//                return@setOnClickListener
-//            }
-//            generateKnockoutMatches()
-//            btnGenerateKnockout.visibility = View.GONE
-//            rvGroups.visibility = View.GONE
-//        }
+                        val sharedPreferences = requireContext().getSharedPreferences(
+                            "tournament_prefs",
+                            Context.MODE_PRIVATE
+                        )
+                        val editor = sharedPreferences.edit()
+                        editor.putBoolean("isGroupGenerated_${tournament?.tournamentName}", true)
+                        editor.apply()
+                    }
+                }
+                }
+        }
 
         // 时间选择
         timeContainer = view.findViewById(R.id.timeContainer)
@@ -558,48 +566,6 @@ class EditTournamentFragment : Fragment() {
         return groups
     }
 
-    private fun loadGroupResults(): Map<String, List<String>> {
-        val sharedPreferences = requireContext().getSharedPreferences("tournament_data", Context.MODE_PRIVATE)
-        val gson = Gson()
-        val json = sharedPreferences.getString("match_list", null)
-
-        // 如果数据为空，返回空的 Map
-        if (json.isNullOrEmpty()) {
-            return emptyMap()
-        }
-
-        // 解析 match_list
-        val type = object : TypeToken<MutableList<GroupMatchModel>>() {}.type
-        val matchList: MutableList<GroupMatchModel> = gson.fromJson(json, type)
-
-        // 构建分组结果
-        val groupResults = mutableMapOf<String, MutableList<Pair<String, Int>>>()
-
-        matchList.forEach { match ->
-            // 假设 match.group 表示该比赛属于哪个小组
-            val group = match.group
-            val teamA = match.teamA
-            val teamB = match.teamB
-
-            // 为每支队伍初始化积分
-            groupResults.putIfAbsent(group, mutableListOf())
-            val teams = groupResults[group]!!
-
-            // 这里假设 match.scoreA 和 match.scoreB 表示两队的得分
-            val scoreA = match.scoreA?: 0
-            val scoreB = match.scoreB?: 0
-
-            // 根据比赛结果更新积分
-            updateTeamScore(teams, teamA, if (scoreA > scoreB) 3 else if (scoreA == scoreB) 1 else 0)
-            updateTeamScore(teams, teamB, if (scoreB > scoreA) 3 else if (scoreA == scoreB) 1 else 0)
-        }
-
-        // 对每个小组的队伍按积分排序，并返回前两名
-        return groupResults.mapValues { entry ->
-            entry.value.sortedByDescending { it.second }.map { it.first }.take(2)
-        }
-    }
-
     private fun updateTeamScore(teams: MutableList<Pair<String, Int>>, teamName: String, points: Int) {
         val existingTeam = teams.find { it.first == teamName }
         if (existingTeam != null) {
@@ -743,7 +709,7 @@ class EditTournamentFragment : Fragment() {
                     // 查看是否结束淘汰赛
                     checkGroupStageCompletion()
 
-                    // 保存到 SharedPreferences 或 TournamentModel
+                    // 保存到 SharedPreferences 和 TournamentModel
                     saveGroupMatchData(match)
                     updateTournament(tournament!!)
                 } else {
@@ -771,17 +737,19 @@ class EditTournamentFragment : Fragment() {
                     match.scoreA = scoreA
                     match.scoreB = scoreB
                     match.isFinished = true
-
                     // 更新RecyclerView
+                    val matchAdapter =
+                        KnockoutMatchAdapter(tournament!!.knockoutMatches ?: mutableListOf(),
+                            { match -> showKnockoutScoreInputDialog(match) })
                     binding.rvMatches.layoutManager = LinearLayoutManager(requireContext())
                     binding.rvMatches.adapter = matchAdapter
+                    val matches = tournament!!.knockoutMatches!!
 
-                    // 查看是否结束淘汰赛
-                    checkGroupStageCompletion()
-
+                    if (matches.all { it.isFinished } && matches.isNotEmpty()) onKnockoutRoundFinished(matches)
                     // 保存到 SharedPreferences 或 TournamentModel
                     saveKnockoutMatchData(match)
                     updateTournament(tournament!!)
+
                 } else {
                     Toast.makeText(requireContext(), "请输入有效的比分", Toast.LENGTH_SHORT).show()
                 }
@@ -951,4 +919,77 @@ class EditTournamentFragment : Fragment() {
         editor.putString("match_list", gson.toJson(matchList))
         editor.apply()
     }
+
+    private fun onKnockoutRoundFinished(matches: List<KnockoutMatchModel>) {
+        // 获取胜者
+        val winners = getWinners(matches)
+        if (winners.isEmpty()) {
+            Toast.makeText(requireContext(), "尚未完成所有比赛，无法生成下一轮赛程！", Toast.LENGTH_SHORT).show()
+            return
+        }
+        // 进入淘汰赛
+        AlertDialog.Builder(requireContext())
+            .setTitle("进入下一轮淘汰赛")
+            .setMessage("本轮淘汰赛已结束，即将进入下一轮淘汰赛。")
+            .setPositiveButton("我知道了") { _, _ ->
+                // 生成下一轮赛程
+                val nextRound = generateNextRound(winners)
+                // 更新淘汰赛赛程
+                nextRound.forEach { _ ->
+                    val matchAdapter = KnockoutMatchAdapter(tournament!!.knockoutMatches ?: mutableListOf() ,
+                        {match -> showKnockoutScoreInputDialog(match)})
+                    binding.rvMatches.layoutManager = LinearLayoutManager(requireContext())
+                    binding.rvMatches.adapter = matchAdapter
+                    updateTournament(tournament!!)
+                }
+            }
+            .show()
+
+    }
+
+    private fun getWinners(matches: List<KnockoutMatchModel>): List<String> {
+        return matches.mapNotNull {
+            if (it.scoreA != null && it.scoreB != null) {
+                // 判断比分高的队伍
+                if (it.scoreA!! > it.scoreB!!) it.teamA else it.teamB
+            } else {
+                null // 比赛未完成，不返回胜者
+            }
+        }
+    }
+
+    private fun generateNextRound(winners: List<String>): List<KnockoutMatchModel> {
+        val nextRoundMatches = mutableListOf<KnockoutMatchModel>()
+        val matchTimes = tournament!!.matchTimes.split(", ")
+        val playingFields = tournament!!.playingFields.split(", ")
+        val referees = tournament!!.referees.split(", ")
+        var timeIndex = 0
+
+        // 两两分组生成比赛
+        for (i in winners.indices step 2) {
+            if (i + 1 < winners.size) {
+                val teamA = winners[i]
+                val teamB = winners[winners.size - 1 - i]
+                val matchTime = matchTimes.getOrElse(timeIndex % matchTimes.size) { "未安排" }
+                val playingField = playingFields.random()
+                val referee = referees.random()
+                nextRoundMatches.add(
+                    KnockoutMatchModel(
+                        matchId = "KO_${System.currentTimeMillis()}_${i / 2}", // 比赛ID
+                        teamA = teamA, // 胜者1
+                        teamB = teamB, // 胜者2
+                        referee = referee, // 示例裁判
+                        playingField = playingField,
+                        matchTime = matchTime
+                    )
+                )
+
+                timeIndex = (timeIndex + 1) % matchTimes.size
+            }
+        }
+        tournament!!.knockoutMatches!!.clear()
+        tournament!!.knockoutMatches!!.addAll(nextRoundMatches)
+        return nextRoundMatches
+    }
+
 }

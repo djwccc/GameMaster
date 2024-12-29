@@ -53,5 +53,9 @@ data class TournamentModel(
             return arrayOfNulls(size)
         }
     }
+
+    enum class Stage {
+        GROUP, KNOCKOUT
+    }
 }
 
