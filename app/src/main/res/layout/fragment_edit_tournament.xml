@@ -154,6 +154,12 @@
                 android:layout_height="wrap_content"
                 tools:listitem="@layout/item_group_match" />
 
+            <TextView
+            android:id="@+id/tvRanking"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="28sp" />
+
             <Button
                 android:id="@+id/btn_generate_group"
                 android:layout_width="match_parent"
@@ -162,15 +168,6 @@
                 android:text="进行小组赛分组"
                 android:textColor="@android:color/white"
                 android:layout_gravity="bottom"/>
-
-            <Button
-                android:id="@+id/btn_generate_knockout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_margin="16dp"
-                android:text="生成淘汰赛"
-                android:textColor="@android:color/white"
-                android:visibility="gone" />
 
             <ScrollView
                 android:id="@+id/scroll_bracket"

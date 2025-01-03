@@ -41,8 +41,10 @@ class EditTournamentFragment : Fragment() {
     private lateinit var timeContainer: LinearLayout
     private lateinit var matchAdapter: GroupMatchAdapter
     private lateinit var btnGenerateGroup: Button
-    private lateinit var btnGenerateKnockout: Button
     private lateinit var rvGroups: RecyclerView
+    private lateinit var tvRanking: TextView
+    private val rankingList = mutableListOf<TeamStats>()
+    private var teamStats = mutableMapOf<String, TeamStats>()
     private var _binding: FragmentEditTournamentBinding? = null
     private val binding get() = _binding!!
 
@@ -125,6 +127,7 @@ class EditTournamentFragment : Fragment() {
             // 判断是否进入了淘汰赛
             if (isGroupFinished) {
                 btnGenerateGroup.visibility = View.GONE
+                rvGroups.visibility = View.GONE
                 // 刷新 RecyclerView 显示淘汰赛赛程
                 val matchAdapter =
                     KnockoutMatchAdapter(tournament!!.knockoutMatches ?: mutableListOf(),
@@ -200,6 +203,7 @@ class EditTournamentFragment : Fragment() {
         val chipGroupTeams: ChipGroup = view.findViewById(R.id.chipGroupTeams)
         val btnAddReferee: Button = view.findViewById(R.id.btnAddReferee)
         val chipGroupReferees: ChipGroup = view.findViewById(R.id.chipGroupReferees)
+        tvRanking = view.findViewById(R.id.tvRanking)
 
         // 动态添加比赛场地
         btnAddPlayingField.setOnClickListener {
@@ -566,24 +570,15 @@ class EditTournamentFragment : Fragment() {
         return groups
     }
 
-    private fun updateTeamScore(teams: MutableList<Pair<String, Int>>, teamName: String, points: Int) {
-        val existingTeam = teams.find { it.first == teamName }
-        if (existingTeam != null) {
-            teams[teams.indexOf(existingTeam)] = existingTeam.copy(second = existingTeam.second + points)
-        } else {
-            teams.add(Pair(teamName, points))
-        }
-    }
-
     // 生成小组赛赛程
     private fun generateGroupMatches(groups: Map<String, List<String>>): List<GroupMatchModel> {
         val matchList = mutableListOf<GroupMatchModel>()
-        val matchTimes = tournament!!.matchTimes.split(", ")
+        val matchTimes = tournament!!.matchTimes.split(", ").toMutableList()
         val playingFields = tournament!!.playingFields.split(", ")
         val referees = tournament!!.referees.split(", ")
         var matchId = 0
-        var timeIndex = 0
         val groupNames = groups.keys.toList()
+        var timeIndex = 0
 
         // 遍历每个小组，生成小组赛赛程
         for (groupName in groupNames) {
@@ -609,13 +604,14 @@ class EditTournamentFragment : Fragment() {
 
                     matchList.add(matchModel)
                     timeIndex = (timeIndex + 1) % matchTimes.size
+                    updateTournament(tournament!!)
                     matchId ++
                 }
             }
         }
         tournament!!.generatedMatches!!.clear()
         tournament!!.generatedMatches!!.addAll(matchList)
-        return matchList
+        return matchList.sortedBy { it.matchTime }
     }
 
     @SuppressLint("NotifyDataSetChanged")
@@ -706,7 +702,7 @@ class EditTournamentFragment : Fragment() {
                     binding.rvMatches.layoutManager = LinearLayoutManager(requireContext())
                     binding.rvMatches.adapter = matchAdapter
 
-                    // 查看是否结束淘汰赛
+                    // 查看是否结束小组赛
                     checkGroupStageCompletion()
 
                     // 保存到 SharedPreferences 和 TournamentModel
@@ -745,7 +741,25 @@ class EditTournamentFragment : Fragment() {
                     binding.rvMatches.adapter = matchAdapter
                     val matches = tournament!!.knockoutMatches!!
 
-                    if (matches.all { it.isFinished } && matches.isNotEmpty()) onKnockoutRoundFinished(matches)
+                    if (matches.all { it.isFinished } && matches.isNotEmpty()) {
+                        matches.forEach { _ ->
+                            updateTeamStats(match.teamA, match.teamB, match.scoreA!!,match.scoreB!!)
+                        }
+
+                        // 继续淘汰赛
+                        if (matches.size > 1) onKnockoutRoundFinished(matches)
+                        else {
+                            // 结束比赛
+                            AlertDialog.Builder(requireContext())
+                                .setTitle("全部比赛已经结束")
+                                .setMessage("全部比赛已结束，系统将输出比赛总排名。")
+                                .setPositiveButton("我知道了") { _, _ ->
+                                }
+                                .show()
+                            matchOver()
+                        }
+
+                    }
                     // 保存到 SharedPreferences 或 TournamentModel
                     saveKnockoutMatchData(match)
                     updateTournament(tournament!!)
@@ -768,13 +782,13 @@ class EditTournamentFragment : Fragment() {
             // 进入淘汰赛
             AlertDialog.Builder(requireContext())
                 .setTitle("小组赛结束")
-                .setMessage("小组赛已结束，是否进入淘汰赛？")
-                .setPositiveButton("确定") { _, _ ->
-                    // 进入淘汰赛逻辑
-                    proceedToKnockoutStage(matches)
+                .setMessage("小组赛已结束，即将进入淘汰赛。")
+                .setPositiveButton("我知道了") { _, _ ->
                 }
-                .setNegativeButton("取消", null)
                 .show()
+
+            // 进入淘汰赛逻辑
+            proceedToKnockoutStage(matches)
         }
     }
 
@@ -816,8 +830,11 @@ class EditTournamentFragment : Fragment() {
     }
 
     private fun generateKnockoutMatches(teams: MutableList<String>): MutableList<KnockoutMatchModel> {
+        val lastGroupMatchTime = tournament!!.generatedMatches!!.last().matchTime
         val knockoutMatches = mutableListOf<KnockoutMatchModel>()
-        val matchTimes = tournament!!.matchTimes.split(", ")
+        var matchTimes = tournament!!.matchTimes.split(", ")
+        val processTimeIndex = matchTimes.indexOf(lastGroupMatchTime) + 1
+        matchTimes = matchTimes.slice(processTimeIndex..<matchTimes.size)
         val playingFields = tournament!!.playingFields.split(", ")
         val referees = tournament!!.referees.split(", ")
         var matchId = 100
@@ -841,15 +858,23 @@ class EditTournamentFragment : Fragment() {
 
             knockoutMatches.add(match)
             timeIndex = (timeIndex + 1) % matchTimes.size
+            updateTournament(tournament!!)
             matchId ++
         }
         tournament!!.knockoutMatches!!.clear()
         tournament!!.knockoutMatches!!.addAll(knockoutMatches)
-        return knockoutMatches
+        return knockoutMatches.sortedBy { it.matchTime }.toMutableList()
     }
 
     private fun proceedToKnockoutStage(matches: MutableList<GroupMatchModel>) {
         val teams = getTeamsForKnockout(matches)
+
+        // 初始化排名
+        rankingList.clear()
+        rankingList.addAll(teams.map { teamName ->
+            TeamStats(teamName, 0)
+        })
+
         val knockoutMatches = generateKnockoutMatches(teams)
 
         // 保存淘汰赛赛程
@@ -861,15 +886,6 @@ class EditTournamentFragment : Fragment() {
         binding.rvMatches.layoutManager = LinearLayoutManager(requireContext())
         binding.rvMatches.adapter = matchAdapter
         updateTournament(tournament!!)
-    }
-
-    private fun saveKnockoutMatches(matches: MutableList<KnockoutMatchModel>) {
-        val sharedPreferences = requireContext().getSharedPreferences("tournament_data", Context.MODE_PRIVATE)
-        val gson = Gson()
-
-        val editor = sharedPreferences.edit()
-        editor.putString("knockout_match_list", gson.toJson(matches))
-        editor.apply()
     }
 
     private fun saveGroupMatchData(match: GroupMatchModel) {
@@ -893,6 +909,15 @@ class EditTournamentFragment : Fragment() {
 
         val editor = sharedPreferences.edit()
         editor.putString("match_list", gson.toJson(matchList))
+        editor.apply()
+    }
+
+    private fun saveKnockoutMatches(matches: MutableList<KnockoutMatchModel>) {
+        val sharedPreferences = requireContext().getSharedPreferences("tournament_data", Context.MODE_PRIVATE)
+        val gson = Gson()
+
+        val editor = sharedPreferences.edit()
+        editor.putString("knockout_match_list", gson.toJson(matches))
         editor.apply()
     }
 
@@ -932,19 +957,18 @@ class EditTournamentFragment : Fragment() {
             .setTitle("进入下一轮淘汰赛")
             .setMessage("本轮淘汰赛已结束，即将进入下一轮淘汰赛。")
             .setPositiveButton("我知道了") { _, _ ->
-                // 生成下一轮赛程
-                val nextRound = generateNextRound(winners)
-                // 更新淘汰赛赛程
-                nextRound.forEach { _ ->
-                    val matchAdapter = KnockoutMatchAdapter(tournament!!.knockoutMatches ?: mutableListOf() ,
-                        {match -> showKnockoutScoreInputDialog(match)})
-                    binding.rvMatches.layoutManager = LinearLayoutManager(requireContext())
-                    binding.rvMatches.adapter = matchAdapter
-                    updateTournament(tournament!!)
-                }
             }
             .show()
-
+        // 生成下一轮赛程
+        val nextRound = generateNextRound(winners)
+        // 更新淘汰赛赛程
+        nextRound.forEach { _ ->
+            val matchAdapter = KnockoutMatchAdapter(tournament!!.knockoutMatches ?: mutableListOf() ,
+                {match -> showKnockoutScoreInputDialog(match)})
+            binding.rvMatches.layoutManager = LinearLayoutManager(requireContext())
+            binding.rvMatches.adapter = matchAdapter
+            updateTournament(tournament!!)
+        }
     }
 
     private fun getWinners(matches: List<KnockoutMatchModel>): List<String> {
@@ -959,8 +983,11 @@ class EditTournamentFragment : Fragment() {
     }
 
     private fun generateNextRound(winners: List<String>): List<KnockoutMatchModel> {
+        val progressMatchTime = tournament!!.knockoutMatches!!.last().matchTime
         val nextRoundMatches = mutableListOf<KnockoutMatchModel>()
-        val matchTimes = tournament!!.matchTimes.split(", ")
+        var matchTimes = tournament!!.matchTimes.split(", ")
+        val processTimeIndex = matchTimes.indexOf(progressMatchTime) + 1
+        matchTimes = matchTimes.slice(processTimeIndex..<matchTimes.size)
         val playingFields = tournament!!.playingFields.split(", ")
         val referees = tournament!!.referees.split(", ")
         var timeIndex = 0
@@ -984,12 +1011,43 @@ class EditTournamentFragment : Fragment() {
                     )
                 )
 
+                tournament!!.matchTimes = matchTimes.joinToString(", ")
                 timeIndex = (timeIndex + 1) % matchTimes.size
+                updateTournament(tournament!!)
             }
         }
         tournament!!.knockoutMatches!!.clear()
         tournament!!.knockoutMatches!!.addAll(nextRoundMatches)
-        return nextRoundMatches
+        return nextRoundMatches.sortedBy { it.matchTime }
     }
 
+    private fun updateTeamStats(team1: String,team2: String,score1: Int,score2: Int) {
+        val stats1 = teamStats.getOrPut(team1) { TeamStats(teamName = team1) }
+        val stats2 = teamStats.getOrPut(team2) { TeamStats(teamName = team2) }
+
+        // 通过积分的方法辅助统计排名
+        when {
+            score1 > score2 -> stats1.points += 3
+            score1 < score2 -> stats2.points += 3
+            else -> {
+                stats1.points += 1
+                stats2.points += 1
+            }
+        }
+    }
+
+    private fun matchOver() {
+        rvGroups.visibility = View.GONE
+        matchRecyclerView.visibility = View.GONE
+        tvRanking.visibility = View.VISIBLE
+        rankingList.sortedByDescending { it.points } // 按积分降序排列
+
+        tvRanking = TextView(requireContext()).apply {
+            val rankingText = "最终排名：\n" + rankingList.mapIndexed { index, teamStats ->
+                "${index + 1}. ${teamStats.teamName}"
+            }.joinToString("\n")
+            // 设置到 TextView
+            tvRanking.text = rankingText
+        }
+    }
 }
